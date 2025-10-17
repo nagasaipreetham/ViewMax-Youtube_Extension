@@ -8,6 +8,12 @@ class ViewMax {
   }
 
   async init() {
+    // Only run on video pages (URLs containing watch?v=)
+    if (!this.isVideoPage()) {
+      console.log('ViewMax: Not on video page, skipping initialization');
+      return;
+    }
+
     // Wait for YouTube to load
     await this.waitForYouTube();
 
@@ -38,6 +44,11 @@ class ViewMax {
         sendResponse({ success: true });
       }
     });
+  }
+
+  isVideoPage() {
+    // Check if URL contains watch?v= which indicates a video is playing
+    return window.location.href.includes('watch?v=');
   }
 
   waitForYouTube() {
@@ -234,31 +245,45 @@ class ViewMax {
     const playerContainer = document.querySelector('#movie_player');
     const video = document.querySelector('video');
     const videoContainer = document.querySelector('.html5-video-container');
-    const pageContainer = document.querySelector('ytd-watch-flexy');
     
     if (playerContainer && video) {
-      // Remove CSS class
+      // Remove CSS class first
       playerContainer.classList.remove('viewmax-fullscreen');
       
-      // Reset video styles
-      video.style.width = '';
-      video.style.height = '';
-      video.style.objectFit = '';
-      
-      // Reset controls
-      const controls = document.querySelector('.ytp-chrome-bottom');
-      const progressBar = document.querySelector('.ytp-progress-bar-container');
-      
-      if (controls) {
-        controls.style.width = '';
-        controls.style.maxWidth = '';
-        controls.style.padding = '';
+      // Restore original styles using stored values
+      this.restoreOriginalStyles(playerContainer);
+      this.restoreOriginalStyles(video);
+      if (videoContainer) {
+        this.restoreOriginalStyles(videoContainer);
       }
       
-      if (progressBar) {
-        progressBar.style.width = '';
-        progressBar.style.maxWidth = '';
-      }
+      // Reset all control elements completely
+      this.resetAllControlStyles();
+      
+      // Force YouTube to recalculate video size properly
+      setTimeout(() => {
+        // Trigger YouTube's internal resize handler
+        if (window.ytplayer && window.ytplayer.config) {
+          const ytPlayer = document.querySelector('#movie_player');
+          if (ytPlayer && ytPlayer.wrappedJSObject) {
+            try {
+              ytPlayer.wrappedJSObject.onResize();
+            } catch (e) {
+              // Fallback method
+              const resizeEvent = new Event('resize', { bubbles: true });
+              window.dispatchEvent(resizeEvent);
+            }
+          } else {
+            // Standard fallback
+            const resizeEvent = new Event('resize', { bubbles: true });
+            window.dispatchEvent(resizeEvent);
+          }
+        } else {
+          // Final fallback
+          const resizeEvent = new Event('resize', { bubbles: true });
+          window.dispatchEvent(resizeEvent);
+        }
+      }, 200);
 
       // Update toggle status
       if (this.toggleElement) {
@@ -270,6 +295,31 @@ class ViewMax {
         }
       }
     }
+  }
+
+  resetAllControlStyles() {
+    // List of all control selectors that might have been modified
+    const controlSelectors = [
+      '.ytp-chrome-bottom',
+      '.ytp-progress-bar-container',
+      '.ytp-progress-bar',
+      '.ytp-chrome-controls',
+      '.ytp-left-controls',
+      '.ytp-right-controls',
+      '.ytp-progress-bar-padding',
+      '.ytp-scrubber-container',
+      '.ytp-play-progress',
+      '.ytp-load-progress'
+    ];
+
+    // Reset all control elements
+    controlSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(element => {
+        element.style.cssText = '';
+        element.removeAttribute('style');
+      });
+    });
   }
 
   maintainVideoAspectRatio() {
@@ -332,28 +382,97 @@ class ViewMax {
   }
 
   updateControlsResponsiveness() {
+    if (!this.isFullWebMode) return;
+
     const controls = document.querySelector('.ytp-chrome-bottom');
-    const progressBar = document.querySelector('.ytp-progress-bar-container');
+    const progressBarContainer = document.querySelector('.ytp-progress-bar-container');
+    const progressBarPadding = document.querySelector('.ytp-progress-bar-padding');
+    const progressBar = document.querySelector('.ytp-progress-bar');
     
-    if (controls && this.isFullWebMode) {
-      // Force controls to be responsive
-      controls.style.width = '100vw';
-      controls.style.maxWidth = 'none';
+    if (controls) {
+      // Calculate available width for timeline (accounting for padding)
+      const windowWidth = window.innerWidth;
+      const paddingWidth = windowWidth > 1000 ? 80 : 40; // 40px padding on each side for >1000px
+      const availableWidth = windowWidth - paddingWidth;
       
-      if (progressBar) {
-        progressBar.style.width = '100%';
-        progressBar.style.maxWidth = 'none';
+      // Force controls to be responsive
+      controls.style.setProperty('width', '100vw', 'important');
+      controls.style.setProperty('max-width', 'none', 'important');
+      
+      // Aggressively fix timeline for screens above 1000px
+      if (progressBarContainer) {
+        progressBarContainer.style.setProperty('width', '100%', 'important');
+        progressBarContainer.style.setProperty('max-width', 'none', 'important');
+        progressBarContainer.style.setProperty('flex', '1', 'important');
+        progressBarContainer.style.setProperty('min-width', '0', 'important');
       }
       
-      // Trigger a layout recalculation
+      if (progressBarPadding) {
+        progressBarPadding.style.setProperty('width', '100%', 'important');
+        progressBarPadding.style.setProperty('flex', '1', 'important');
+        progressBarPadding.style.setProperty('min-width', '0', 'important');
+        progressBarPadding.style.setProperty('max-width', 'none', 'important');
+      }
+      
+      if (progressBar) {
+        progressBar.style.setProperty('width', '100%', 'important');
+        progressBar.style.setProperty('max-width', 'none', 'important');
+      }
+      
+      // Use MutationObserver to continuously enforce timeline width
+      this.enforceTimelineWidth();
+      
+      // Force multiple layout recalculations
       setTimeout(() => {
-        if (controls.offsetParent) {
-          controls.style.display = 'none';
-          controls.offsetHeight; // Force reflow
-          controls.style.display = '';
-        }
+        this.forceTimelineReflow();
       }, 50);
+      
+      setTimeout(() => {
+        this.forceTimelineReflow();
+      }, 200);
     }
+  }
+
+  enforceTimelineWidth() {
+    if (this.timelineObserver) {
+      this.timelineObserver.disconnect();
+    }
+
+    const progressBarContainer = document.querySelector('.ytp-progress-bar-container');
+    if (progressBarContainer && this.isFullWebMode) {
+      this.timelineObserver = new MutationObserver(() => {
+        if (this.isFullWebMode) {
+          const currentWidth = progressBarContainer.style.width;
+          if (currentWidth && currentWidth.includes('px') && !currentWidth.includes('100%')) {
+            progressBarContainer.style.setProperty('width', '100%', 'important');
+            progressBarContainer.style.setProperty('max-width', 'none', 'important');
+          }
+        }
+      });
+
+      this.timelineObserver.observe(progressBarContainer, {
+        attributes: true,
+        attributeFilter: ['style']
+      });
+    }
+  }
+
+  forceTimelineReflow() {
+    const elements = [
+      '.ytp-progress-bar-container',
+      '.ytp-progress-bar-padding',
+      '.ytp-progress-bar',
+      '.ytp-chrome-bottom'
+    ];
+
+    elements.forEach(selector => {
+      const element = document.querySelector(selector);
+      if (element && element.offsetParent) {
+        element.style.display = 'none';
+        element.offsetHeight; // Force reflow
+        element.style.display = '';
+      }
+    });
   }
 
   debounce(func, wait) {
@@ -461,6 +580,11 @@ class ViewMax {
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
     }
+    
+    // Clean up timeline observer
+    if (this.timelineObserver) {
+      this.timelineObserver.disconnect();
+    }
   }
 
   handleKeyboard(e) {
@@ -495,6 +619,21 @@ class ViewMax {
   }
 
   async handleNavigation() {
+    // Only handle navigation if we're on a video page
+    if (!this.isVideoPage()) {
+      // If we're leaving a video page, clean up
+      const existingToggle = document.getElementById('viewmax-toggle');
+      if (existingToggle) {
+        existingToggle.remove();
+      }
+      // Disable full web mode if it's active
+      if (this.isFullWebMode) {
+        this.isFullWebMode = false;
+        this.disableFullWebMode();
+      }
+      return;
+    }
+
     // Wait for new video to load
     await this.waitForYouTube();
 
