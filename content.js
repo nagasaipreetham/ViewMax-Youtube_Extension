@@ -2,6 +2,9 @@ class ViewMax {
   constructor() {
     this.isFullWebMode = false;
     this.toggleElement = null;
+    this.microToggleElement = null;
+    this.microToggleProcessing = false;
+    this.microToggleEventHandler = null;
     this.hiddenElements = [];
     this.originalStyles = new Map();
     this.init();
@@ -23,9 +26,15 @@ class ViewMax {
     // Create toggle
     this.createToggle();
 
+    // Create micro toggle (initially hidden)
+    this.createMicroToggle();
+
     // Apply current state
     if (this.isFullWebMode) {
       this.enableFullWebMode();
+      this.showMicroToggle();
+    } else {
+      this.hideMicroToggle();
     }
 
     // Listen for navigation changes
@@ -176,14 +185,22 @@ class ViewMax {
 
     if (this.isFullWebMode) {
       this.enableFullWebMode();
+      this.showMicroToggle();
     } else {
       this.disableFullWebMode();
+      this.hideMicroToggle();
     }
 
     // Update checkbox state
     const checkbox = document.querySelector('#viewmax-checkbox');
     if (checkbox) {
       checkbox.checked = this.isFullWebMode;
+    }
+
+    // Update micro toggle state if it exists
+    const microCheckbox = document.querySelector('#viewmax-micro-checkbox');
+    if (microCheckbox) {
+      microCheckbox.checked = this.isFullWebMode;
     }
 
     this.saveState();
@@ -385,26 +402,49 @@ class ViewMax {
     if (!this.isFullWebMode) return;
 
     const controls = document.querySelector('.ytp-chrome-bottom');
+    const chromeControls = document.querySelector('.ytp-chrome-controls');
     const progressBarContainer = document.querySelector('.ytp-progress-bar-container');
     const progressBarPadding = document.querySelector('.ytp-progress-bar-padding');
     const progressBar = document.querySelector('.ytp-progress-bar');
+    const leftControls = document.querySelector('.ytp-left-controls');
+    const rightControls = document.querySelector('.ytp-right-controls');
     
     if (controls) {
-      // Calculate available width for timeline (accounting for padding)
-      const windowWidth = window.innerWidth;
-      const paddingWidth = windowWidth > 1000 ? 80 : 40; // 40px padding on each side for >1000px
-      const availableWidth = windowWidth - paddingWidth;
-      
-      // Force controls to be responsive
+      // Force controls to be responsive and stretch full width
       controls.style.setProperty('width', '100vw', 'important');
       controls.style.setProperty('max-width', 'none', 'important');
+      controls.style.setProperty('display', 'flex', 'important');
+      controls.style.setProperty('align-items', 'center', 'important');
       
-      // Aggressively fix timeline for screens above 1000px
+      // Ensure chrome controls container stretches full width
+      if (chromeControls) {
+        chromeControls.style.setProperty('width', '100%', 'important');
+        chromeControls.style.setProperty('max-width', 'none', 'important');
+        chromeControls.style.setProperty('display', 'flex', 'important');
+        chromeControls.style.setProperty('align-items', 'center', 'important');
+        chromeControls.style.setProperty('justify-content', 'space-between', 'important');
+      }
+      
+      // Fix left and right controls to not shrink
+      if (leftControls) {
+        leftControls.style.setProperty('flex-shrink', '0', 'important');
+        leftControls.style.setProperty('display', 'flex', 'important');
+        leftControls.style.setProperty('align-items', 'center', 'important');
+      }
+      
+      if (rightControls) {
+        rightControls.style.setProperty('flex-shrink', '0', 'important');
+        rightControls.style.setProperty('display', 'flex', 'important');
+        rightControls.style.setProperty('align-items', 'center', 'important');
+      }
+      
+      // Make timeline stretch to fill available space between left and right controls
       if (progressBarContainer) {
         progressBarContainer.style.setProperty('width', '100%', 'important');
         progressBarContainer.style.setProperty('max-width', 'none', 'important');
         progressBarContainer.style.setProperty('flex', '1', 'important');
         progressBarContainer.style.setProperty('min-width', '0', 'important');
+        progressBarContainer.style.setProperty('margin', '0 12px', 'important');
       }
       
       if (progressBarPadding) {
@@ -575,6 +615,153 @@ class ViewMax {
     }
   }
 
+  createMicroToggle() {
+    // Remove existing micro toggle if present
+    const existingMicroToggle = document.getElementById('viewmax-micro-toggle');
+    if (existingMicroToggle) {
+      existingMicroToggle.remove();
+    }
+
+    // Create micro toggle container
+    const microContainer = document.createElement("div");
+    microContainer.id = "viewmax-micro-toggle";
+    
+    microContainer.innerHTML = `
+      <label class="viewmax-micro-switch">
+        <input type="checkbox" id="viewmax-micro-checkbox" ${this.isFullWebMode ? 'checked' : ''}>
+        <span class="viewmax-micro-slider"></span>
+      </label>
+    `;
+
+    // Add to document body (will be positioned in title bar area via CSS)
+    document.body.appendChild(microContainer);
+    
+    // Apply dynamic positioning based on viewport and YouTube layout
+    this.updateMicroTogglePosition(microContainer);
+
+    // Add event listener with improved error handling
+    const microCheckbox = document.getElementById("viewmax-micro-checkbox");
+    if (microCheckbox) {
+      microCheckbox.addEventListener("change", (e) => {
+        console.log("ViewMax: Micro toggle changed:", e.target.checked);
+        
+        // Prevent rapid clicking issues
+        if (this.microToggleProcessing) {
+          e.preventDefault();
+          return;
+        }
+        
+        this.microToggleProcessing = true;
+        
+        try {
+          // Only allow disabling through micro toggle (not enabling)
+          if (!e.target.checked && this.isFullWebMode) {
+            this.toggleMode();
+          } else if (e.target.checked && !this.isFullWebMode) {
+            // Prevent enabling through micro toggle - reset to unchecked
+            e.target.checked = false;
+            console.log("ViewMax: Micro toggle can only disable, not enable");
+          }
+        } catch (error) {
+          console.error("ViewMax: Error handling micro toggle change:", error);
+          // Reset to current state on error
+          e.target.checked = this.isFullWebMode;
+        } finally {
+          // Reset processing flag after a short delay
+          setTimeout(() => {
+            this.microToggleProcessing = false;
+          }, 100);
+        }
+      });
+      
+      // Store reference for cleanup
+      this.microToggleEventHandler = microCheckbox;
+    } else {
+      console.error("ViewMax: Could not find micro toggle checkbox for event binding");
+    }
+
+    this.microToggleElement = microContainer;
+    console.log("✅ ViewMax Micro Toggle created");
+  }
+
+  updateMicroTogglePosition(microContainer) {
+    if (!microContainer) return;
+    
+    // Get viewport dimensions
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate safe positioning to avoid YouTube UI conflicts
+    let topPosition = 20;
+    let rightPosition = 20;
+    
+    // Check for YouTube header elements that might interfere
+    const youtubeHeader = document.querySelector('#masthead-container');
+    if (youtubeHeader) {
+      const headerRect = youtubeHeader.getBoundingClientRect();
+      if (headerRect.height > 0) {
+        topPosition = Math.max(20, headerRect.height + 10);
+      }
+    }
+    
+    // Adjust for smaller screens
+    if (viewportWidth <= 768) {
+      topPosition = Math.min(topPosition, 10);
+      rightPosition = 10;
+    } else if (viewportWidth <= 1200) {
+      topPosition = Math.min(topPosition, 15);
+      rightPosition = 15;
+    }
+    
+    // Apply positioning with fallback
+    try {
+      microContainer.style.setProperty('top', `${topPosition}px`, 'important');
+      microContainer.style.setProperty('right', `${rightPosition}px`, 'important');
+      
+      // Ensure it's above all YouTube elements
+      microContainer.style.setProperty('z-index', '10001', 'important');
+      microContainer.style.setProperty('position', 'fixed', 'important');
+    } catch (error) {
+      console.log('ViewMax: Could not set micro toggle position', error);
+      // Fallback to CSS-only positioning
+    }
+  }
+
+  showMicroToggle() {
+    if (!this.microToggleElement) {
+      this.createMicroToggle();
+    }
+    
+    if (this.microToggleElement) {
+      // Update position before showing
+      this.updateMicroTogglePosition(this.microToggleElement);
+      
+      // Show with animation
+      this.microToggleElement.classList.remove('viewmax-micro-hide');
+      this.microToggleElement.classList.add('viewmax-micro-show');
+      this.microToggleElement.style.display = 'block';
+      console.log("ViewMax: Micro toggle shown");
+    }
+  }
+
+  hideMicroToggle() {
+    if (this.microToggleElement) {
+      // Hide with animation
+      this.microToggleElement.classList.remove('viewmax-micro-show');
+      this.microToggleElement.classList.add('viewmax-micro-hide');
+      
+      // Hide after animation completes
+      setTimeout(() => {
+        if (this.microToggleElement) {
+          this.microToggleElement.style.display = 'none';
+          this.microToggleElement.classList.remove('viewmax-micro-hide');
+        }
+      }, 300);
+      
+      console.log("ViewMax: Micro toggle hidden");
+    }
+  }
+
   cleanup() {
     // Clean up event listeners
     if (this.resizeHandler) {
@@ -585,6 +772,28 @@ class ViewMax {
     if (this.timelineObserver) {
       this.timelineObserver.disconnect();
     }
+
+    // Clean up micro toggle and its event listeners
+    if (this.microToggleEventHandler) {
+      try {
+        // Remove event listeners if they exist
+        const microCheckbox = document.getElementById("viewmax-micro-checkbox");
+        if (microCheckbox) {
+          microCheckbox.removeEventListener("change", this.microToggleEventHandler);
+        }
+      } catch (error) {
+        console.log("ViewMax: Error cleaning up micro toggle event listeners:", error);
+      }
+      this.microToggleEventHandler = null;
+    }
+    
+    if (this.microToggleElement) {
+      this.microToggleElement.remove();
+      this.microToggleElement = null;
+    }
+    
+    // Reset processing flags
+    this.microToggleProcessing = false;
   }
 
   handleKeyboard(e) {
