@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "ViewMax",
+  "version": "1.0.0",
+  "description": "ViewMax lets you watch YouTube videos distraction-free by expanding the video to fill the whole webpage.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*"],
+      "js": ["content.js"],
+      "css": ["toggle.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "commands": {
+    "toggle-viewmax": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F"
+      },
+      "description": "Toggle ViewMax mode"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icon.png"],
+      "matches": ["*://www.youtube.com/*"]
+    }
+  ]
+}

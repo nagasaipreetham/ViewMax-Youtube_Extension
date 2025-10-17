@@ -1,0 +1,281 @@
+Extension: "ViewMax"
+
+Project Type:
+Chrome Extension (Manifest V3) built with HTML, CSS, and JavaScript.
+
+🎯 Goal
+Build a Chrome extension called ViewMax that provides a “Full Web Mode” toggle for YouTube videos.
+When enabled, the video should occupy the entire webpage (not fullscreen), hiding all distractions like comments, recommendations, titles, and channel info.
+When disabled, the original YouTube layout should be restored.
+
+🧩 Features
+1.
+Main Functionality
+2.
+1.
+When the toggle is ON, only the YouTube video player should be visible.
+2.
+3.
+The video should automatically resize to fill the entire browser viewport.
+4.
+5.
+All other elements (title, channel name, description, comments, sidebar, etc.) should be hidden.
+6.
+7.
+When OFF, the original layout should be fully restored without any page reload.
+8.
+3.
+Responsive Toggle UI
+4.
+1.
+A toggle component should appear on every YouTube video page.
+2.
+3.
+It should switch between two layouts depending on screen width:
+4.
+A. Large Version (default, width > 900px):
+5.
+1.
+Positioned on the top-right of the video player, above video suggestions.
+2.
+3.
+Contains:
+4.
+1.
+A circular logo (small icon representing the feature, e.g., play icon 🎥)
+2.
+3.
+The name text “ViewMax” beside it.
+4.
+5.
+A toggle switch on the right side.
+6.
+5.
+The whole toggle bar should have:
+6.
+1.
+Rounded corners (border-radius: 20px)
+2.
+3.
+Red gradient background (linear-gradient(90deg, #ff3b3b, #b30000))
+4.
+5.
+White text
+6.
+7.
+Subtle hover animation (slight scale-up or glow)
+8.
+9.
+Cursor pointer interaction.
+10.
+B. Compact Version (width ≤ 900px):
+7.
+Appears below the video, near the Subscribe or Notification bell button.
+8.
+9.
+Displays only:
+10.
+1.
+The logo
+2.
+3.
+The toggle switch (no text label)
+4.
+11.
+Uses the same red gradient color scheme and hover animations.
+12.
+5.
+Toggle Behavior
+6.
+1.
+Smooth transition animation when toggled (fade-in/out or CSS transitions).
+2.
+3.
+Toggle should remain visible in both modes (even when video occupies entire page).
+4.
+5.
+Toggle state should persist during navigation between videos (use chrome.storage.sync).
+6.
+7.
+Design Style
+8.
+1.
+Modern and minimal.
+2.
+3.
+Red-based gradient theme (different shades of red and crimson).
+4.
+5.
+Soft drop shadows.
+6.
+7.
+Use smooth transitions for all interactions (0.3–0.5s ease).
+8.
+9.
+Cursor hover effects on toggle and buttons.
+10.
+11.
+Fonts: “Poppins”, “Inter”, or “Pacifico” for a premium aesthetic.
+12.
+
+⚙️ Technical Details
+1.
+Files to include
+2.
+1.
+manifest.json
+2.
+3.
+content.js (main logic to inject toggle and control layout)
+4.
+5.
+toggle.css (toggle styling)
+6.
+7.
+toggle.html (toggle markup, injected into YouTube pages)
+8.
+9.
+Optional: icons/ folder for extension and toggle icon images
+10.
+3.
+Manifest Configuration
+4.
+1.
+Manifest version: 3
+2.
+3.
+Name: ViewMax
+4.
+5.
+Description: “ViewMax lets you watch YouTube videos distraction-free by expanding the video to fill the whole webpage.”
+6.
+7.
+Permissions:
+8.
+1.
+"activeTab"
+2.
+3.
+"scripting"
+4.
+5.
+"storage"
+6.
+9.
+Content script should run on:
+"matches": ["*://www.youtube.com/*"]
+10.
+5.
+JavaScript Logic (content.js)
+6.
+1.
+On YouTube video page load:
+2.
+1.
+Inject the custom toggle HTML.
+2.
+3.
+Check stored toggle state (ON/OFF).
+4.
+5.
+Apply respective layout mode.
+6.
+3.
+On toggle ON:
+4.
+1.
+Hide unnecessary YouTube elements:
+2.
+1.
+#comments, #secondary, #meta, #below, ytd-merch-shelf-renderer, etc.
+2.
+3.
+.ytd-watch-flexy sidebars and metadata sections.
+4.
+3.
+Set video container:
+4.
+position: fixed;
+top: 0;
+left: 0;
+width: 100vw;
+height: 100vh;
+z-index: 9999;
+background-color: black;
+5.
+6.
+Center video horizontally and vertically.
+7.
+8.
+Keep toggle bar visible right below the video.
+9.
+5.
+On toggle OFF:
+6.
+1.
+Restore all hidden elements.
+2.
+3.
+Reset the player layout to its default.
+4.
+7.
+On window resize:
+8.
+1.
+Adjust toggle layout (switch between large and compact versions dynamically).
+2.
+7.
+CSS Styling
+8.
+1.
+Use red gradients:
+2.
+background: linear-gradient(90deg, #ff3b3b, #b30000);
+3.
+4.
+White or light text.
+5.
+6.
+Rounded corners: border-radius: 20px;
+7.
+8.
+Toggle animation: sliding knob that moves left-right.
+9.
+10.
+Subtle glow on hover:
+11.
+box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+12.
+13.
+Smooth transitions:
+14.
+transition: all 0.3s ease;
+15.
+9.
+Toggle Structure (HTML Example)
+10.
+<div id="focus-tube-toggle" class="focus-tube-large">
+  <img src="icon.png" alt="logo" class="ft-logo" />
+  <span class="ft-title">ViewMax</span>
+  <label class="ft-switch">
+    <input type="checkbox" id="ft-checkbox" />
+    <span class="ft-slider"></span>
+  </label>
+</div>
+11.
+For compact version, only <img> and toggle switch appear.
+12.
+
+💾 Behavior Summary
+Action	Result
+Toggle ON	Hides all distractions, expands video to fill webpage
+Toggle OFF	Restores normal YouTube layout
+Resize window	Switches between large and small toggle layouts
+Navigate to another video	Keeps the toggle state persistent
+Hover toggle	Adds glowing red animation
+Cursor pointer	Smooth UI interaction
+
+
+Add keyboard shortcut (e.g., Ctrl + Shift + F) to toggle ViewMax mode.
+
+Add small fade animation when entering/exiting full webpage mode.
