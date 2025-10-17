@@ -150,7 +150,12 @@ class ViewMax {
   handleResize() {
     // Handle video resizing in full web mode
     if (this.isFullWebMode) {
-      this.maintainVideoAspectRatio();
+      // Use debounced resize to prevent too many calls
+      clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = setTimeout(() => {
+        this.maintainVideoAspectRatio();
+        this.updateControlsResponsiveness();
+      }, 150);
     }
   }
 
@@ -198,10 +203,11 @@ class ViewMax {
       // Apply CSS class for full web mode
       playerContainer.classList.add('viewmax-fullscreen');
       
-      // The CSS class handles the styling
-      
-      // Force video to maintain aspect ratio
-      this.maintainVideoAspectRatio();
+      // Force video to maintain aspect ratio and update controls
+      setTimeout(() => {
+        this.maintainVideoAspectRatio();
+        this.updateControlsResponsiveness();
+      }, 100);
 
       // Update toggle status
       if (this.toggleElement) {
@@ -233,6 +239,26 @@ class ViewMax {
     if (playerContainer && video) {
       // Remove CSS class
       playerContainer.classList.remove('viewmax-fullscreen');
+      
+      // Reset video styles
+      video.style.width = '';
+      video.style.height = '';
+      video.style.objectFit = '';
+      
+      // Reset controls
+      const controls = document.querySelector('.ytp-chrome-bottom');
+      const progressBar = document.querySelector('.ytp-progress-bar-container');
+      
+      if (controls) {
+        controls.style.width = '';
+        controls.style.maxWidth = '';
+        controls.style.padding = '';
+      }
+      
+      if (progressBar) {
+        progressBar.style.width = '';
+        progressBar.style.maxWidth = '';
+      }
 
       // Update toggle status
       if (this.toggleElement) {
@@ -248,46 +274,98 @@ class ViewMax {
 
   maintainVideoAspectRatio() {
     const video = document.querySelector('video');
-    if (!video || !this.isFullWebMode) return;
+    const playerContainer = document.querySelector('#movie_player');
+    if (!video || !this.isFullWebMode || !playerContainer) return;
 
     const updateVideoSize = () => {
       if (!this.isFullWebMode) return;
       
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
-      const videoAspectRatio = video.videoWidth / video.videoHeight;
-      const windowAspectRatio = windowWidth / windowHeight;
+      
+      // Account for controls height (approximately 80px)
+      const availableHeight = windowHeight - 80;
+      
+      if (video.videoWidth && video.videoHeight) {
+        const videoAspectRatio = video.videoWidth / video.videoHeight;
+        const windowAspectRatio = windowWidth / availableHeight;
 
-      if (videoAspectRatio > windowAspectRatio) {
-        // Video is wider than window
-        video.style.width = '100vw';
-        video.style.height = 'auto';
+        if (videoAspectRatio > windowAspectRatio) {
+          // Video is wider than available space - fit to width
+          const calculatedHeight = windowWidth / videoAspectRatio;
+          video.style.width = windowWidth + 'px';
+          video.style.height = calculatedHeight + 'px';
+        } else {
+          // Video is taller than available space - fit to height
+          const calculatedWidth = availableHeight * videoAspectRatio;
+          video.style.width = calculatedWidth + 'px';
+          video.style.height = availableHeight + 'px';
+        }
       } else {
-        // Video is taller than window
-        video.style.width = 'auto';
+        // Fallback if video dimensions not available
+        video.style.width = '100vw';
         video.style.height = '100vh';
+        video.style.objectFit = 'contain';
       }
+      
+      // Update controls responsiveness
+      this.updateControlsResponsiveness();
     };
 
     // Update immediately
-    if (video.videoWidth && video.videoHeight) {
-      updateVideoSize();
-    }
+    updateVideoSize();
 
     // Listen for video metadata load
     video.addEventListener('loadedmetadata', updateVideoSize);
     
-    // Listen for window resize
-    const resizeHandler = () => {
+    // Listen for window resize with debouncing
+    const resizeHandler = this.debounce(() => {
       if (this.isFullWebMode) {
         updateVideoSize();
       }
-    };
+    }, 100);
     
     window.addEventListener('resize', resizeHandler);
     
     // Store the handler for cleanup
     this.resizeHandler = resizeHandler;
+  }
+
+  updateControlsResponsiveness() {
+    const controls = document.querySelector('.ytp-chrome-bottom');
+    const progressBar = document.querySelector('.ytp-progress-bar-container');
+    
+    if (controls && this.isFullWebMode) {
+      // Force controls to be responsive
+      controls.style.width = '100vw';
+      controls.style.maxWidth = 'none';
+      
+      if (progressBar) {
+        progressBar.style.width = '100%';
+        progressBar.style.maxWidth = 'none';
+      }
+      
+      // Trigger a layout recalculation
+      setTimeout(() => {
+        if (controls.offsetParent) {
+          controls.style.display = 'none';
+          controls.offsetHeight; // Force reflow
+          controls.style.display = '';
+        }
+      }, 50);
+    }
+  }
+
+  debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
   }
 
   hideElements() {

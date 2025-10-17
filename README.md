@@ -67,7 +67,3 @@ ViewMax/
 - Chrome (Manifest V3)
 - Edge (Chromium-based)
 - Other Chromium-based browsers
-
-## License
-
-This project is open source and available under the MIT License.
