@@ -63,7 +63,7 @@
   font-size: 10px;
   color: #ffcccc;
   text-align: right;
-  min-width: 80px;
+  min-width: 45px;
   font-family: 'Poppins', sans-serif;
 }
 
@@ -305,37 +305,41 @@ input:checked~.viewmax-switch {
 
 /* Responsive design */
 @media (max-width: 900px) {
-  #viewmax-toggle {
+
+  /* Only apply these rules to sidebar toggle, not below-player toggle */
+  #viewmax-toggle.viewmax-toggle-sidebar {
     max-width: 200px;
     padding: 8px 12px;
   }
 
-  .viewmax-label {
+  .viewmax-toggle-sidebar .viewmax-label {
     font-size: 18px;
   }
 
-  .viewmax-logo {
+  .viewmax-toggle-sidebar .viewmax-logo {
     width: 28px;
     height: 28px;
   }
 
-  .viewmax-status-indicator {
+  .viewmax-toggle-sidebar .viewmax-status-indicator {
     font-size: 9px;
     min-width: 60px;
   }
 }
 
 @media (max-width: 600px) {
-  #viewmax-toggle {
+
+  /* Only apply these rules to sidebar toggle, not below-player toggle */
+  #viewmax-toggle.viewmax-toggle-sidebar {
     max-width: 120px;
     padding: 6px 10px;
   }
 
-  .viewmax-label {
+  .viewmax-toggle-sidebar .viewmax-label {
     display: none;
   }
 
-  .viewmax-status-indicator {
+  .viewmax-toggle-sidebar .viewmax-status-indicator {
     font-size: 8px;
     min-width: 40px;
   }
@@ -504,81 +508,98 @@ cro Toggle - Small toggle in title bar */
 /* Responsive Toggle Positioning */
 /* When toggle is below player (≤1000px width) */
 .viewmax-toggle-below-player {
-  width: 100% !important;
+  width: calc(100% - 40px) !important;
   max-width: none !important;
-  margin: 12px 16px !important;
-  border-radius: 0 !important;
+  margin: 12px 20px !important;
   border-radius: 8px !important;
+  box-sizing: border-box !important;
 }
 
 /* When toggle is in sidebar (>1000px width) */
 .viewmax-toggle-sidebar {
-  width: 100%;
-  max-width: 360px;
+  width: calc(100% - 24px) !important;
+  max-width: 340px !important;
   margin-bottom: 12px;
   margin-right: 12px;
   border-radius: 14px;
+  box-sizing: border-box;
 }
 
 /* Responsive toggle positioning media queries */
 @media (max-width: 1000px) {
   #viewmax-toggle {
-    width: 100% !important;
+    width: calc(100% - 40px) !important;
     max-width: none !important;
-    margin: 12px 0 !important;
+    margin: 12px 20px !important;
     border-radius: 8px !important;
+    box-sizing: border-box !important;
   }
 
   /* Full width styling when below player */
   .viewmax-toggle-below-player .viewmax-ui {
     justify-content: space-between;
-    padding: 0 8px;
-  }
-
-  .viewmax-toggle-below-player .viewmax-label {
-    font-size: 20px;
-  }
-
-  .viewmax-toggle-below-player .viewmax-logo {
-    width: 32px;
-    height: 32px;
-  }
-}
-
-@media (max-width: 768px) {
-  .viewmax-toggle-below-player {
-    padding: 8px 16px !important;
-    margin: 8px 0 !important;
+    padding: 0 4px;
   }
 
   .viewmax-toggle-below-player .viewmax-label {
     font-size: 18px;
+    display: block !important;
   }
 
   .viewmax-toggle-below-player .viewmax-logo {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
+  }
+
+  .viewmax-toggle-below-player .viewmax-status-indicator {
+    min-width: 40px;
+    font-size: 9px;
   }
 }
 
-@media (max-width: 480px) {
-  .viewmax-toggle-below-player {
-    padding: 6px 12px !important;
-    margin: 6px 0 !important;
+@media (max-width: 768px) {
+  #viewmax-toggle {
+    width: calc(100% - 30px) !important;
+    margin: 8px 15px !important;
+    padding: 8px 12px !important;
   }
 
   .viewmax-toggle-below-player .viewmax-label {
     font-size: 16px;
+    display: block !important;
   }
 
   .viewmax-toggle-below-player .viewmax-logo {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
   }
 
   .viewmax-toggle-below-player .viewmax-status-indicator {
-    font-size: 8px;
     min-width: 35px;
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  #viewmax-toggle {
+    width: calc(100% - 24px) !important;
+    margin: 6px 12px !important;
+    padding: 6px 10px !important;
+  }
+
+  .viewmax-toggle-below-player .viewmax-label {
+    font-size: 14px;
+    display: block !important;
+  }
+
+  .viewmax-toggle-below-player .viewmax-logo {
+    width: 22px;
+    height: 22px;
+  }
+
+  .viewmax-toggle-below-player .viewmax-status-indicator {
+    font-size: 7px;
+    min-width: 30px;
   }
 }
 
@@ -591,6 +612,29 @@ cro Toggle - Small toggle in title bar */
 @media (max-width: 1000px) {
   #viewmax-toggle.viewmax-toggle-below-player {
     max-width: none !important;
-    width: 100% !important;
+    width: calc(100% - 40px) !important;
+  }
+}
+
+/* Ensure proper spacing for controls */
+.viewmax-controls {
+  flex-shrink: 0 !important;
+  min-width: 110px;
+}
+
+.viewmax-switch {
+  flex-shrink: 0 !important;
+}
+
+/* Ensure ViewMax label is always visible when below player */
+.viewmax-toggle-below-player .viewmax-label {
+  display: block !important;
+}
+
+/* Sidebar specific constraints to prevent overflow */
+@media (min-width: 1001px) {
+  #viewmax-toggle.viewmax-toggle-sidebar {
+    width: calc(100% - 24px) !important;
+    max-width: 340px !important;
   }
 }
