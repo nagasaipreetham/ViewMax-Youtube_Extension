@@ -159,8 +159,8 @@ input:checked~.viewmax-switch {
 
 /* Make video controls responsive in full web mode */
 #movie_player.viewmax-fullscreen .ytp-chrome-bottom {
-  width: 100vw !important;
-  max-width: none !important;
+  width: 100% !important;
+  max-width: 100vw !important;
   position: absolute !important;
   bottom: 0 !important;
   left: 0 !important;
@@ -173,22 +173,26 @@ input:checked~.viewmax-switch {
 
 #movie_player.viewmax-fullscreen .ytp-progress-bar-container {
   width: 100% !important;
-  max-width: none !important;
+  max-width: 100% !important;
   flex: 1 !important;
   min-width: 0 !important;
   margin: 0 12px !important;
+  box-sizing: border-box !important;
 }
 
 #movie_player.viewmax-fullscreen .ytp-progress-bar {
   width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
-/* Additional timeline responsiveness fixes */
+/* Timeline responsiveness - keep timeline within bounds */
 #movie_player.viewmax-fullscreen .ytp-progress-bar-padding {
   flex: 1 !important;
   min-width: 0 !important;
   width: 100% !important;
-  max-width: none !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 #movie_player.viewmax-fullscreen .ytp-scrubber-container {
@@ -208,27 +212,15 @@ input:checked~.viewmax-switch {
 
 #movie_player.viewmax-fullscreen .ytp-chrome-controls {
   width: 100% !important;
-  max-width: none !important;
+  max-width: 100% !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   flex: 1 !important;
+  box-sizing: border-box !important;
 }
 
-/* Aggressive timeline fixes for all screen sizes, especially above 1000px */
-#movie_player.viewmax-fullscreen .ytp-progress-bar-container {
-  width: 100% !important;
-  max-width: none !important;
-  flex: 1 !important;
-  min-width: 0 !important;
-}
 
-#movie_player.viewmax-fullscreen .ytp-progress-bar-padding {
-  width: 100% !important;
-  max-width: none !important;
-  flex: 1 !important;
-  min-width: 0 !important;
-}
 
 /* Responsive controls for different screen sizes */
 @media (min-width: 1000px) {
@@ -236,30 +228,7 @@ input:checked~.viewmax-switch {
     padding: 0 40px !important;
   }
 
-  /* Extra aggressive timeline fixes for screens above 1000px */
-  #movie_player.viewmax-fullscreen .ytp-progress-bar-container {
-    width: 100% !important;
-    max-width: none !important;
-    flex: 1 !important;
-    min-width: 0 !important;
-  }
 
-  #movie_player.viewmax-fullscreen .ytp-progress-bar-padding {
-    width: 100% !important;
-    max-width: none !important;
-    flex: 1 !important;
-    min-width: 0 !important;
-  }
-
-  #movie_player.viewmax-fullscreen .ytp-progress-bar {
-    width: 100% !important;
-    max-width: none !important;
-  }
-
-  /* Override any fixed pixel widths */
-  #movie_player.viewmax-fullscreen .ytp-progress-bar-container[style*="width"] {
-    width: 100% !important;
-  }
 }
 
 @media (min-width: 1400px) {
@@ -286,11 +255,28 @@ input:checked~.viewmax-switch {
   flex-shrink: 0 !important;
 }
 
-#movie_player.viewmax-fullscreen .ytp-progress-bar-padding {
-  flex: 1 !important;
-  min-width: 0 !important;
+/* Volume icon and mute button sizing */
+#movie_player.viewmax-fullscreen .ytp-volume-icon {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+#movie_player.viewmax-fullscreen .ytp-mute-button.ytp-button {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+
+
+/* Ensure timeline elements stay within bounds */
+#movie_player.viewmax-fullscreen .ytp-scrubber-container,
+#movie_player.viewmax-fullscreen .ytp-play-progress,
+#movie_player.viewmax-fullscreen .ytp-load-progress,
+#movie_player.viewmax-fullscreen .ytp-hover-progress,
+#movie_player.viewmax-fullscreen .ytp-progress-list {
   width: 100% !important;
-  max-width: none !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 /* Ensure video container doesn't interfere with controls */

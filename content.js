@@ -426,10 +426,11 @@ class ViewMax {
     
     if (controls) {
       // Force controls to be responsive and stretch full width
-      controls.style.setProperty('width', '100vw', 'important');
-      controls.style.setProperty('max-width', 'none', 'important');
+      controls.style.setProperty('width', '100%', 'important');
+      controls.style.setProperty('max-width', '100vw', 'important');
       controls.style.setProperty('display', 'flex', 'important');
       controls.style.setProperty('align-items', 'center', 'important');
+      controls.style.setProperty('box-sizing', 'border-box', 'important');
       
       // Ensure chrome controls container stretches full width
       if (chromeControls) {
@@ -456,79 +457,55 @@ class ViewMax {
       // Make timeline stretch to fill available space between left and right controls
       if (progressBarContainer) {
         progressBarContainer.style.setProperty('width', '100%', 'important');
-        progressBarContainer.style.setProperty('max-width', 'none', 'important');
+        progressBarContainer.style.setProperty('max-width', '100%', 'important');
         progressBarContainer.style.setProperty('flex', '1', 'important');
         progressBarContainer.style.setProperty('min-width', '0', 'important');
         progressBarContainer.style.setProperty('margin', '0 12px', 'important');
+        progressBarContainer.style.setProperty('box-sizing', 'border-box', 'important');
       }
       
       if (progressBarPadding) {
         progressBarPadding.style.setProperty('width', '100%', 'important');
+        progressBarPadding.style.setProperty('max-width', '100%', 'important');
         progressBarPadding.style.setProperty('flex', '1', 'important');
         progressBarPadding.style.setProperty('min-width', '0', 'important');
-        progressBarPadding.style.setProperty('max-width', 'none', 'important');
+        progressBarPadding.style.setProperty('box-sizing', 'border-box', 'important');
       }
       
       if (progressBar) {
         progressBar.style.setProperty('width', '100%', 'important');
-        progressBar.style.setProperty('max-width', 'none', 'important');
+        progressBar.style.setProperty('max-width', '100%', 'important');
+        progressBar.style.setProperty('box-sizing', 'border-box', 'important');
       }
       
-      // Use MutationObserver to continuously enforce timeline width
-      this.enforceTimelineWidth();
-      
-      // Force multiple layout recalculations
+      // Simple timeline width enforcement
       setTimeout(() => {
-        this.forceTimelineReflow();
-      }, 50);
-      
-      setTimeout(() => {
-        this.forceTimelineReflow();
-      }, 200);
+        this.ensureTimelineWithinBounds();
+      }, 100);
     }
   }
 
-  enforceTimelineWidth() {
-    if (this.timelineObserver) {
-      this.timelineObserver.disconnect();
-    }
+  ensureTimelineWithinBounds() {
+    if (!this.isFullWebMode) return;
 
-    const progressBarContainer = document.querySelector('.ytp-progress-bar-container');
-    if (progressBarContainer && this.isFullWebMode) {
-      this.timelineObserver = new MutationObserver(() => {
-        if (this.isFullWebMode) {
-          const currentWidth = progressBarContainer.style.width;
-          if (currentWidth && currentWidth.includes('px') && !currentWidth.includes('100%')) {
-            progressBarContainer.style.setProperty('width', '100%', 'important');
-            progressBarContainer.style.setProperty('max-width', 'none', 'important');
-          }
-        }
-      });
-
-      this.timelineObserver.observe(progressBarContainer, {
-        attributes: true,
-        attributeFilter: ['style']
-      });
-    }
-  }
-
-  forceTimelineReflow() {
-    const elements = [
+    const timelineElements = [
       '.ytp-progress-bar-container',
       '.ytp-progress-bar-padding',
       '.ytp-progress-bar',
-      '.ytp-chrome-bottom'
+      '.ytp-scrubber-container'
     ];
 
-    elements.forEach(selector => {
+    timelineElements.forEach(selector => {
       const element = document.querySelector(selector);
-      if (element && element.offsetParent) {
-        element.style.display = 'none';
-        element.offsetHeight; // Force reflow
-        element.style.display = '';
+      if (element) {
+        element.style.setProperty('width', '100%', 'important');
+        element.style.setProperty('max-width', '100%', 'important');
+        element.style.setProperty('box-sizing', 'border-box', 'important');
       }
     });
   }
+
+
 
   debounce(func, wait) {
     let timeout;
