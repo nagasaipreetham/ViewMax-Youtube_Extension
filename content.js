@@ -35,13 +35,20 @@ class ViewMax {
       this.showMicroToggle();
     } else {
       this.hideMicroToggle();
+      // Ensure main toggle is visible when ViewMax is not active
+      if (this.toggleElement) {
+        this.toggleElement.style.display = 'flex';
+      }
     }
 
     // Listen for navigation changes
     this.observeNavigation();
 
     // Listen for window resize
-    window.addEventListener('resize', () => this.handleResize());
+    window.addEventListener('resize', () => {
+      this.handleResize();
+      this.handleResponsiveTogglePosition();
+    });
 
     // Keyboard shortcut
     document.addEventListener('keydown', (e) => this.handleKeyboard(e));
@@ -160,6 +167,10 @@ class ViewMax {
     });
 
     this.toggleElement = container;
+    
+    // Handle initial responsive positioning
+    this.handleResponsiveTogglePosition();
+    
     console.log("✅ ViewMax UI injected successfully");
   }
 
@@ -237,10 +248,12 @@ class ViewMax {
         this.updateControlsResponsiveness();
       }, 100);
 
-      // Update toggle status
+      // Update toggle status and hide main toggle during ViewMax mode
       if (this.toggleElement) {
         this.toggleElement.setAttribute('data-status', 'active');
         this.toggleElement.style.zIndex = '10000';
+        // Hide main toggle during ViewMax mode - only show micro toggle
+        this.toggleElement.style.display = 'none';
         const statusIndicator = document.getElementById('viewmaxStatus');
         if (statusIndicator) {
           statusIndicator.textContent = 'Active';
@@ -302,10 +315,12 @@ class ViewMax {
         }
       }, 200);
 
-      // Update toggle status
+      // Update toggle status and show main toggle when ViewMax is disabled
       if (this.toggleElement) {
         this.toggleElement.setAttribute('data-status', 'inactive');
         this.toggleElement.style.zIndex = '';
+        // Show main toggle when ViewMax is disabled
+        this.toggleElement.style.display = 'flex';
         const statusIndicator = document.getElementById('viewmaxStatus');
         if (statusIndicator) {
           statusIndicator.textContent = 'Ready';
@@ -684,6 +699,77 @@ class ViewMax {
     console.log("✅ ViewMax Micro Toggle created");
   }
 
+  handleResponsiveTogglePosition() {
+    if (!this.toggleElement) return;
+    
+    const viewportWidth = window.innerWidth;
+    console.log(`ViewMax: Handling responsive toggle position for width: ${viewportWidth}px`);
+    
+    // Don't reposition if ViewMax is active (main toggle should be hidden)
+    if (this.isFullWebMode) {
+      console.log("ViewMax: Skipping toggle repositioning - ViewMax mode is active");
+      return;
+    }
+    
+    if (viewportWidth <= 1000) {
+      // Small/Medium screens: Move toggle below player
+      this.moveToggleBelowPlayer();
+    } else {
+      // Large screens: Move toggle back to sidebar
+      this.moveToggleToSidebar();
+    }
+  }
+
+  moveToggleBelowPlayer() {
+    if (!this.toggleElement) return;
+    
+    // Find the player div
+    const playerDiv = document.querySelector('#player');
+    if (!playerDiv) {
+      console.log("ViewMax: Player div not found, retrying...");
+      setTimeout(() => this.moveToggleBelowPlayer(), 500);
+      return;
+    }
+    
+    // Remove from current parent
+    this.toggleElement.remove();
+    
+    // Add responsive class for styling
+    this.toggleElement.classList.add('viewmax-toggle-below-player');
+    this.toggleElement.classList.remove('viewmax-toggle-sidebar');
+    
+    // Insert after the player div
+    playerDiv.insertAdjacentElement('afterend', this.toggleElement);
+    
+    console.log("ViewMax: Toggle moved below player");
+  }
+
+  moveToggleToSidebar() {
+    if (!this.toggleElement) return;
+    
+    // Find the sidebar
+    const sidebar = document.querySelector('#secondary');
+    if (!sidebar) {
+      console.log("ViewMax: Sidebar not found, retrying...");
+      setTimeout(() => this.moveToggleToSidebar(), 500);
+      return;
+    }
+    
+    // Remove from current parent
+    this.toggleElement.remove();
+    
+    // Add sidebar class for styling
+    this.toggleElement.classList.add('viewmax-toggle-sidebar');
+    this.toggleElement.classList.remove('viewmax-toggle-below-player');
+    
+    // Insert at the top of sidebar
+    sidebar.prepend(this.toggleElement);
+    
+    console.log("ViewMax: Toggle moved to sidebar");
+  }
+
+
+
   updateMicroTogglePosition(microContainer) {
     if (!microContainer) return;
     
@@ -791,6 +877,8 @@ class ViewMax {
       this.microToggleElement.remove();
       this.microToggleElement = null;
     }
+
+
     
     // Reset processing flags
     this.microToggleProcessing = false;
@@ -846,10 +934,13 @@ class ViewMax {
     // Wait for new video to load
     await this.waitForYouTube();
 
-    // Recreate toggle if it doesn't exist
+    // Recreate toggles if they don't exist
     if (!document.getElementById('viewmax-toggle')) {
       this.createToggle();
     }
+    
+    // Handle responsive toggle positioning
+    this.handleResponsiveTogglePosition();
 
     // Reapply current state
     if (this.isFullWebMode) {

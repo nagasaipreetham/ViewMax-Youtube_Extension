@@ -10,9 +10,15 @@
   ],
   "content_scripts": [
     {
-      "matches": ["*://www.youtube.com/*"],
-      "js": ["content.js"],
-      "css": ["toggle.css"],
+      "matches": [
+        "*://www.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "toggle.css"
+      ],
       "run_at": "document_end"
     }
   ],
@@ -34,8 +40,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icon.png"],
-      "matches": ["*://www.youtube.com/*"]
+      "resources": [
+        "icon.png"
+      ],
+      "matches": [
+        "*://www.youtube.com/*"
+      ]
     }
   ]
 }

@@ -5,6 +5,7 @@
   background: linear-gradient(145deg, #cc0000, #800000);
   padding: 10px 18px;
   margin-bottom: 12px;
+  margin-right: 12px;
   border-radius: 14px;
   display: flex;
   align-items: center;
@@ -22,7 +23,7 @@
 #viewmax-toggle:hover {
   box-shadow: 0 0 20px 4px rgba(204, 0, 0, 0.6);
   background-position: center;
-  background-image: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,0,0,0.3), transparent 40%);
+  background-image: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 0, 0, 0.3), transparent 40%);
   background-size: 150% 150%;
 }
 
@@ -99,20 +100,20 @@
   width: 24px;
   background-color: #fff;
   border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-input:checked + .viewmax-slider {
+input:checked+.viewmax-slider {
   transform: translateX(26px);
   background-color: #fff;
   box-shadow: 0 0 6px rgba(204, 0, 0, 0.6);
 }
 
-.viewmax-switch input:checked ~ .viewmax-slider {
+.viewmax-switch input:checked~.viewmax-slider {
   background-color: #fff;
 }
 
-input:checked ~ .viewmax-switch {
+input:checked~.viewmax-switch {
   background-color: #ff9999;
 }
 
@@ -234,7 +235,7 @@ input:checked ~ .viewmax-switch {
   #movie_player.viewmax-fullscreen .ytp-chrome-bottom {
     padding: 0 40px !important;
   }
-  
+
   /* Extra aggressive timeline fixes for screens above 1000px */
   #movie_player.viewmax-fullscreen .ytp-progress-bar-container {
     width: 100% !important;
@@ -242,19 +243,19 @@ input:checked ~ .viewmax-switch {
     flex: 1 !important;
     min-width: 0 !important;
   }
-  
+
   #movie_player.viewmax-fullscreen .ytp-progress-bar-padding {
     width: 100% !important;
     max-width: none !important;
     flex: 1 !important;
     min-width: 0 !important;
   }
-  
+
   #movie_player.viewmax-fullscreen .ytp-progress-bar {
     width: 100% !important;
     max-width: none !important;
   }
-  
+
   /* Override any fixed pixel widths */
   #movie_player.viewmax-fullscreen .ytp-progress-bar-container[style*="width"] {
     width: 100% !important;
@@ -308,16 +309,16 @@ input:checked ~ .viewmax-switch {
     max-width: 200px;
     padding: 8px 12px;
   }
-  
+
   .viewmax-label {
     font-size: 18px;
   }
-  
+
   .viewmax-logo {
     width: 28px;
     height: 28px;
   }
-  
+
   .viewmax-status-indicator {
     font-size: 9px;
     min-width: 60px;
@@ -329,16 +330,17 @@ input:checked ~ .viewmax-switch {
     max-width: 120px;
     padding: 6px 10px;
   }
-  
+
   .viewmax-label {
     display: none;
   }
-  
+
   .viewmax-status-indicator {
     font-size: 8px;
     min-width: 40px;
   }
 }
+
 /* Mi
 cro Toggle - Small toggle in title bar */
 #viewmax-micro-toggle {
@@ -389,11 +391,11 @@ cro Toggle - Small toggle in title bar */
   width: 18px;
   background-color: #fff;
   border-radius: 50%;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
 }
 
-.viewmax-micro-switch input:checked + .viewmax-micro-slider {
+.viewmax-micro-switch input:checked+.viewmax-micro-slider {
   transform: translateX(16px);
   background-color: #fff;
   box-shadow: 0 0 4px rgba(204, 0, 0, 0.6);
@@ -412,18 +414,18 @@ cro Toggle - Small toggle in title bar */
     top: 10px !important;
     right: 10px !important;
   }
-  
+
   .viewmax-micro-switch {
     width: 36px;
     height: 22px;
   }
-  
+
   .viewmax-micro-slider {
     height: 16px;
     width: 16px;
   }
-  
-  .viewmax-micro-switch input:checked + .viewmax-micro-slider {
+
+  .viewmax-micro-switch input:checked+.viewmax-micro-slider {
     transform: translateX(14px);
   }
 }
@@ -433,18 +435,18 @@ cro Toggle - Small toggle in title bar */
     top: 8px !important;
     right: 8px !important;
   }
-  
+
   .viewmax-micro-switch {
     width: 32px;
     height: 20px;
   }
-  
+
   .viewmax-micro-slider {
     height: 14px;
     width: 14px;
   }
-  
-  .viewmax-micro-switch input:checked + .viewmax-micro-slider {
+
+  .viewmax-micro-switch input:checked+.viewmax-micro-slider {
     transform: translateX(12px);
   }
 }
@@ -464,6 +466,7 @@ cro Toggle - Small toggle in title bar */
     opacity: 0;
     transform: translateY(-10px) scale(0.8);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -475,6 +478,7 @@ cro Toggle - Small toggle in title bar */
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+
   to {
     opacity: 0;
     transform: translateY(-10px) scale(0.8);
@@ -491,8 +495,102 @@ cro Toggle - Small toggle in title bar */
   #viewmax-micro-toggle {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   }
-  
+
   #viewmax-micro-toggle:hover {
     box-shadow: 0 0 15px 3px rgba(204, 0, 0, 0.7);
+  }
+}
+
+/* Responsive Toggle Positioning */
+/* When toggle is below player (≤1000px width) */
+.viewmax-toggle-below-player {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 12px 16px !important;
+  border-radius: 0 !important;
+  border-radius: 8px !important;
+}
+
+/* When toggle is in sidebar (>1000px width) */
+.viewmax-toggle-sidebar {
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 12px;
+  margin-right: 12px;
+  border-radius: 14px;
+}
+
+/* Responsive toggle positioning media queries */
+@media (max-width: 1000px) {
+  #viewmax-toggle {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 12px 0 !important;
+    border-radius: 8px !important;
+  }
+
+  /* Full width styling when below player */
+  .viewmax-toggle-below-player .viewmax-ui {
+    justify-content: space-between;
+    padding: 0 8px;
+  }
+
+  .viewmax-toggle-below-player .viewmax-label {
+    font-size: 20px;
+  }
+
+  .viewmax-toggle-below-player .viewmax-logo {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 768px) {
+  .viewmax-toggle-below-player {
+    padding: 8px 16px !important;
+    margin: 8px 0 !important;
+  }
+
+  .viewmax-toggle-below-player .viewmax-label {
+    font-size: 18px;
+  }
+
+  .viewmax-toggle-below-player .viewmax-logo {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .viewmax-toggle-below-player {
+    padding: 6px 12px !important;
+    margin: 6px 0 !important;
+  }
+
+  .viewmax-toggle-below-player .viewmax-label {
+    font-size: 16px;
+  }
+
+  .viewmax-toggle-below-player .viewmax-logo {
+    width: 24px;
+    height: 24px;
+  }
+
+  .viewmax-toggle-below-player .viewmax-status-indicator {
+    font-size: 8px;
+    min-width: 35px;
+  }
+}
+
+/* Ensure smooth transitions between positions */
+#viewmax-toggle {
+  transition: all 0.3s ease;
+}
+
+/* Override existing responsive rules that might conflict */
+@media (max-width: 1000px) {
+  #viewmax-toggle.viewmax-toggle-below-player {
+    max-width: none !important;
+    width: 100% !important;
   }
 }
