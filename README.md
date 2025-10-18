@@ -1,18 +1,5 @@
 # 🎬 ViewMax - Premium YouTube Experience
 
-<div align="center">
-
-![ViewMax Logo](icon.png)
-
-**Transform YouTube into a distraction-free cinematic experience**
-
-[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white)](https://chrome.google.com/webstore)
-[![Manifest V3](https://img.shields.io/badge/Manifest-V3-34A853?style=for-the-badge)](https://developer.chrome.com/docs/extensions/mv3/)
-[![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![CSS3](https://img.shields.io/badge/CSS3-Advanced-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
-
-</div>
-
 ---
 
 ## ✨ Overview
@@ -263,10 +250,6 @@ cd viewmax
 # Go to chrome://extensions/ → Developer mode → Load unpacked
 ```
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - **YouTube** for providing an amazing platform
@@ -278,7 +261,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <div align="center">
 
 **Made with ❤️ for YouTube enthusiasts**
-
-[Report Bug](https://github.com/yourusername/viewmax/issues) • [Request Feature](https://github.com/yourusername/viewmax/issues) • [Documentation](https://github.com/yourusername/viewmax/wiki)
 
 </div>
