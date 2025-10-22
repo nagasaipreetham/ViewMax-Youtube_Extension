@@ -5,7 +5,6 @@
   "description": "ViewMax lets you watch YouTube videos distraction-free by expanding the video to fill the whole webpage.",
   "permissions": [
     "activeTab",
-    "scripting",
     "storage"
   ],
   "content_scripts": [
