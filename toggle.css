@@ -167,7 +167,7 @@ input:checked~.viewmax-switch {
     height: 100vh !important;
     box-sizing: border-box !important;
   }
-  
+
   #movie_player.viewmax-fullscreen video {
     width: 100vw !important;
     height: 100vh !important;
@@ -178,7 +178,7 @@ input:checked~.viewmax-switch {
     max-width: 100vw !important;
     max-height: 100vh !important;
   }
-  
+
   #movie_player.viewmax-fullscreen .html5-video-container {
     width: 100% !important;
     height: 100% !important;
@@ -188,13 +188,19 @@ input:checked~.viewmax-switch {
     position: static !important;
     box-sizing: border-box !important;
   }
-  
+
   /* Override any YouTube responsive styles that might interfere */
   #movie_player.viewmax-fullscreen .html5-main-video {
     width: 100% !important;
     height: 100% !important;
     object-fit: contain !important;
     position: static !important;
+  }
+
+  /* Fix timeline being covered by page scroll at smaller widths */
+  #movie_player.viewmax-fullscreen .ytp-progress-bar-container {
+    padding-right: 15px !important;
+    box-sizing: border-box !important;
   }
 }
 

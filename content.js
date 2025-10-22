@@ -20,8 +20,7 @@ class ViewMax {
     // Wait for YouTube to load
     await this.waitForYouTube();
 
-    // Load saved state
-    await this.loadState();
+
 
     // Create toggle
     this.createToggle();
@@ -83,23 +82,7 @@ class ViewMax {
     });
   }
 
-  async loadState() {
-    try {
-      const result = await chrome.storage.sync.get(['viewmaxEnabled']);
-      this.isFullWebMode = result.viewmaxEnabled || false;
-    } catch (error) {
-      console.log('ViewMax: Could not load state', error);
-      this.isFullWebMode = false;
-    }
-  }
 
-  async saveState() {
-    try {
-      await chrome.storage.sync.set({ viewmaxEnabled: this.isFullWebMode });
-    } catch (error) {
-      console.log('ViewMax: Could not save state', error);
-    }
-  }
 
   createToggle() {
     // Load fonts first like audio enhancer
@@ -214,7 +197,7 @@ class ViewMax {
       microCheckbox.checked = this.isFullWebMode;
     }
 
-    this.saveState();
+
   }
 
   enableFullWebMode() {
