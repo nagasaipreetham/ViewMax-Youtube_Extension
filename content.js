@@ -128,7 +128,7 @@ class ViewMax {
     const container = document.createElement("div");
     container.id = "viewmax-toggle";
     container.setAttribute('data-status', this.isFullWebMode ? 'active' : 'inactive');
-    
+
     container.innerHTML = `
       <div class="viewmax-ui">
         <img src="${chrome.runtime.getURL('icon.png')}" class="viewmax-logo" />
@@ -148,7 +148,7 @@ class ViewMax {
 
     // Add event listeners
     const toggle = document.getElementById("viewmax-checkbox");
-    
+
     toggle.addEventListener("change", (e) => {
       console.log("ViewMax: Toggle changed:", e.target.checked);
       this.toggleMode();
@@ -167,10 +167,10 @@ class ViewMax {
     });
 
     this.toggleElement = container;
-    
+
     // Handle initial responsive positioning
     this.handleResponsiveTogglePosition();
-    
+
     console.log("✅ ViewMax UI injected successfully");
   }
 
@@ -228,20 +228,20 @@ class ViewMax {
     const video = document.querySelector('video');
     const videoContainer = document.querySelector('.html5-video-container');
     const pageContainer = document.querySelector('ytd-watch-flexy');
-    
+
     if (playerContainer && video) {
       // Store original styles for all elements
       this.storeOriginalStyles(playerContainer);
       this.storeOriginalStyles(video);
       if (videoContainer) this.storeOriginalStyles(videoContainer);
       if (pageContainer) this.storeOriginalStyles(pageContainer);
-      
+
       // Set body to prevent scrolling
       document.body.style.overflow = 'hidden';
-      
+
       // Apply CSS class for full web mode
       playerContainer.classList.add('viewmax-fullscreen');
-      
+
       // Force video to maintain aspect ratio and update controls
       setTimeout(() => {
         this.maintainVideoAspectRatio();
@@ -275,45 +275,43 @@ class ViewMax {
     const playerContainer = document.querySelector('#movie_player');
     const video = document.querySelector('video');
     const videoContainer = document.querySelector('.html5-video-container');
-    
+
     if (playerContainer && video) {
       // Remove CSS class first
       playerContainer.classList.remove('viewmax-fullscreen');
-      
+
       // Restore original styles using stored values
       this.restoreOriginalStyles(playerContainer);
       this.restoreOriginalStyles(video);
       if (videoContainer) {
         this.restoreOriginalStyles(videoContainer);
       }
-      
+
       // Reset all control elements completely
       this.resetAllControlStyles();
-      
-      // Force YouTube to recalculate video size properly
+
+      // Clear any inline styles that might interfere with restoration
+      video.style.removeProperty('object-fit');
+      video.style.removeProperty('width');
+      video.style.removeProperty('height');
+
+      // Force YouTube to recalculate video size properly with multiple fallbacks
       setTimeout(() => {
-        // Trigger YouTube's internal resize handler
-        if (window.ytplayer && window.ytplayer.config) {
-          const ytPlayer = document.querySelector('#movie_player');
-          if (ytPlayer && ytPlayer.wrappedJSObject) {
-            try {
-              ytPlayer.wrappedJSObject.onResize();
-            } catch (e) {
-              // Fallback method
-              const resizeEvent = new Event('resize', { bubbles: true });
-              window.dispatchEvent(resizeEvent);
-            }
-          } else {
-            // Standard fallback
-            const resizeEvent = new Event('resize', { bubbles: true });
-            window.dispatchEvent(resizeEvent);
-          }
-        } else {
-          // Final fallback
-          const resizeEvent = new Event('resize', { bubbles: true });
-          window.dispatchEvent(resizeEvent);
+        // Trigger resize event to force YouTube to recalculate
+        const resizeEvent = new Event('resize', { bubbles: true });
+        window.dispatchEvent(resizeEvent);
+
+        // Additional fallback - trigger on video element
+        if (video.dispatchEvent) {
+          video.dispatchEvent(new Event('resize'));
         }
-      }, 200);
+      }, 100);
+
+      // Second attempt after a longer delay
+      setTimeout(() => {
+        const resizeEvent = new Event('resize', { bubbles: true });
+        window.dispatchEvent(resizeEvent);
+      }, 300);
 
       // Update toggle status and show main toggle when ViewMax is disabled
       if (this.toggleElement) {
@@ -355,62 +353,32 @@ class ViewMax {
   }
 
   maintainVideoAspectRatio() {
+    // Simplified: Let CSS handle the centering and sizing
+    // CSS object-fit: contain will automatically center and maintain aspect ratio
     const video = document.querySelector('video');
     const playerContainer = document.querySelector('#movie_player');
     if (!video || !this.isFullWebMode || !playerContainer) return;
 
-    const updateVideoSize = () => {
-      if (!this.isFullWebMode) return;
-      
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
-      
-      // Account for controls height (approximately 80px)
-      const availableHeight = windowHeight - 80;
-      
-      if (video.videoWidth && video.videoHeight) {
-        const videoAspectRatio = video.videoWidth / video.videoHeight;
-        const windowAspectRatio = windowWidth / availableHeight;
+    // Ensure proper centering, especially for viewports < 1015px
+    video.style.setProperty('object-fit', 'contain', 'important');
 
-        if (videoAspectRatio > windowAspectRatio) {
-          // Video is wider than available space - fit to width
-          const calculatedHeight = windowWidth / videoAspectRatio;
-          video.style.width = windowWidth + 'px';
-          video.style.height = calculatedHeight + 'px';
-        } else {
-          // Video is taller than available space - fit to height
-          const calculatedWidth = availableHeight * videoAspectRatio;
-          video.style.width = calculatedWidth + 'px';
-          video.style.height = availableHeight + 'px';
-        }
-      } else {
-        // Fallback if video dimensions not available
-        video.style.width = '100vw';
-        video.style.height = '100vh';
-        video.style.objectFit = 'contain';
+    // Additional fix for smaller screens (< 1015px)
+    if (window.innerWidth <= 1015) {
+      video.style.setProperty('position', 'static', 'important');
+      video.style.setProperty('margin', '0 auto', 'important');
+      video.style.setProperty('display', 'block', 'important');
+
+      // Ensure container is properly centered
+      const videoContainer = document.querySelector('.html5-video-container');
+      if (videoContainer) {
+        videoContainer.style.setProperty('display', 'flex', 'important');
+        videoContainer.style.setProperty('align-items', 'center', 'important');
+        videoContainer.style.setProperty('justify-content', 'center', 'important');
       }
-      
-      // Update controls responsiveness
-      this.updateControlsResponsiveness();
-    };
+    }
 
-    // Update immediately
-    updateVideoSize();
-
-    // Listen for video metadata load
-    video.addEventListener('loadedmetadata', updateVideoSize);
-    
-    // Listen for window resize with debouncing
-    const resizeHandler = this.debounce(() => {
-      if (this.isFullWebMode) {
-        updateVideoSize();
-      }
-    }, 100);
-    
-    window.addEventListener('resize', resizeHandler);
-    
-    // Store the handler for cleanup
-    this.resizeHandler = resizeHandler;
+    // Update controls responsiveness
+    this.updateControlsResponsiveness();
   }
 
   updateControlsResponsiveness() {
@@ -423,7 +391,7 @@ class ViewMax {
     const progressBar = document.querySelector('.ytp-progress-bar');
     const leftControls = document.querySelector('.ytp-left-controls');
     const rightControls = document.querySelector('.ytp-right-controls');
-    
+
     if (controls) {
       // Force controls to be responsive and stretch full width
       controls.style.setProperty('width', '100%', 'important');
@@ -431,7 +399,7 @@ class ViewMax {
       controls.style.setProperty('display', 'flex', 'important');
       controls.style.setProperty('align-items', 'center', 'important');
       controls.style.setProperty('box-sizing', 'border-box', 'important');
-      
+
       // Ensure chrome controls container stretches full width
       if (chromeControls) {
         chromeControls.style.setProperty('width', '100%', 'important');
@@ -440,20 +408,20 @@ class ViewMax {
         chromeControls.style.setProperty('align-items', 'center', 'important');
         chromeControls.style.setProperty('justify-content', 'space-between', 'important');
       }
-      
+
       // Fix left and right controls to not shrink
       if (leftControls) {
         leftControls.style.setProperty('flex-shrink', '0', 'important');
         leftControls.style.setProperty('display', 'flex', 'important');
         leftControls.style.setProperty('align-items', 'center', 'important');
       }
-      
+
       if (rightControls) {
         rightControls.style.setProperty('flex-shrink', '0', 'important');
         rightControls.style.setProperty('display', 'flex', 'important');
         rightControls.style.setProperty('align-items', 'center', 'important');
       }
-      
+
       // Make timeline stretch to fill available space between left and right controls
       if (progressBarContainer) {
         progressBarContainer.style.setProperty('width', '100%', 'important');
@@ -463,7 +431,7 @@ class ViewMax {
         progressBarContainer.style.setProperty('margin', '0 12px', 'important');
         progressBarContainer.style.setProperty('box-sizing', 'border-box', 'important');
       }
-      
+
       if (progressBarPadding) {
         progressBarPadding.style.setProperty('width', '100%', 'important');
         progressBarPadding.style.setProperty('max-width', '100%', 'important');
@@ -471,13 +439,13 @@ class ViewMax {
         progressBarPadding.style.setProperty('min-width', '0', 'important');
         progressBarPadding.style.setProperty('box-sizing', 'border-box', 'important');
       }
-      
+
       if (progressBar) {
         progressBar.style.setProperty('width', '100%', 'important');
         progressBar.style.setProperty('max-width', '100%', 'important');
         progressBar.style.setProperty('box-sizing', 'border-box', 'important');
       }
-      
+
       // Simple timeline width enforcement
       setTimeout(() => {
         this.ensureTimelineWithinBounds();
@@ -582,7 +550,7 @@ class ViewMax {
 
   storeOriginalStyles(element) {
     if (!element) return;
-    
+
     const styles = [
       'position', 'top', 'left', 'width', 'height', 'zIndex', 'backgroundColor',
       'display', 'alignItems', 'justifyContent', 'objectFit', 'maxWidth', 'maxHeight'
@@ -598,7 +566,7 @@ class ViewMax {
 
   restoreOriginalStyles(element) {
     if (!element) return;
-    
+
     const originalStyles = this.originalStyles.get(element);
     if (originalStyles) {
       Object.keys(originalStyles).forEach(style => {
@@ -617,7 +585,7 @@ class ViewMax {
     // Create micro toggle container
     const microContainer = document.createElement("div");
     microContainer.id = "viewmax-micro-toggle";
-    
+
     microContainer.innerHTML = `
       <label class="viewmax-micro-switch">
         <input type="checkbox" id="viewmax-micro-checkbox" ${this.isFullWebMode ? 'checked' : ''}>
@@ -627,7 +595,7 @@ class ViewMax {
 
     // Add to document body (will be positioned in title bar area via CSS)
     document.body.appendChild(microContainer);
-    
+
     // Apply dynamic positioning based on viewport and YouTube layout
     this.updateMicroTogglePosition(microContainer);
 
@@ -636,15 +604,15 @@ class ViewMax {
     if (microCheckbox) {
       microCheckbox.addEventListener("change", (e) => {
         console.log("ViewMax: Micro toggle changed:", e.target.checked);
-        
+
         // Prevent rapid clicking issues
         if (this.microToggleProcessing) {
           e.preventDefault();
           return;
         }
-        
+
         this.microToggleProcessing = true;
-        
+
         try {
           // Only allow disabling through micro toggle (not enabling)
           if (!e.target.checked && this.isFullWebMode) {
@@ -665,7 +633,7 @@ class ViewMax {
           }, 100);
         }
       });
-      
+
       // Store reference for cleanup
       this.microToggleEventHandler = microCheckbox;
     } else {
@@ -678,17 +646,17 @@ class ViewMax {
 
   handleResponsiveTogglePosition() {
     if (!this.toggleElement) return;
-    
+
     const viewportWidth = window.innerWidth;
     console.log(`ViewMax: Handling responsive toggle position for width: ${viewportWidth}px`);
-    
+
     // Don't reposition if ViewMax is active (main toggle should be hidden)
     if (this.isFullWebMode) {
       console.log("ViewMax: Skipping toggle repositioning - ViewMax mode is active");
       return;
     }
-    
-    if (viewportWidth <= 1000) {
+
+    if (viewportWidth <= 1015) {
       // Small/Medium screens: Move toggle below player
       this.moveToggleBelowPlayer();
     } else {
@@ -699,7 +667,7 @@ class ViewMax {
 
   moveToggleBelowPlayer() {
     if (!this.toggleElement) return;
-    
+
     // Find the player div
     const playerDiv = document.querySelector('#player');
     if (!playerDiv) {
@@ -707,23 +675,23 @@ class ViewMax {
       setTimeout(() => this.moveToggleBelowPlayer(), 500);
       return;
     }
-    
+
     // Remove from current parent
     this.toggleElement.remove();
-    
+
     // Add responsive class for styling
     this.toggleElement.classList.add('viewmax-toggle-below-player');
     this.toggleElement.classList.remove('viewmax-toggle-sidebar');
-    
+
     // Insert after the player div
     playerDiv.insertAdjacentElement('afterend', this.toggleElement);
-    
+
     console.log("ViewMax: Toggle moved below player");
   }
 
   moveToggleToSidebar() {
     if (!this.toggleElement) return;
-    
+
     // Find the sidebar
     const sidebar = document.querySelector('#secondary');
     if (!sidebar) {
@@ -731,17 +699,17 @@ class ViewMax {
       setTimeout(() => this.moveToggleToSidebar(), 500);
       return;
     }
-    
+
     // Remove from current parent
     this.toggleElement.remove();
-    
+
     // Add sidebar class for styling
     this.toggleElement.classList.add('viewmax-toggle-sidebar');
     this.toggleElement.classList.remove('viewmax-toggle-below-player');
-    
+
     // Insert at the top of sidebar
     sidebar.prepend(this.toggleElement);
-    
+
     console.log("ViewMax: Toggle moved to sidebar");
   }
 
@@ -749,15 +717,15 @@ class ViewMax {
 
   updateMicroTogglePosition(microContainer) {
     if (!microContainer) return;
-    
+
     // Get viewport dimensions
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    
+
     // Calculate safe positioning to avoid YouTube UI conflicts
     let topPosition = 20;
     let rightPosition = 20;
-    
+
     // Check for YouTube header elements that might interfere
     const youtubeHeader = document.querySelector('#masthead-container');
     if (youtubeHeader) {
@@ -766,7 +734,7 @@ class ViewMax {
         topPosition = Math.max(20, headerRect.height + 10);
       }
     }
-    
+
     // Adjust for smaller screens
     if (viewportWidth <= 768) {
       topPosition = Math.min(topPosition, 10);
@@ -775,12 +743,12 @@ class ViewMax {
       topPosition = Math.min(topPosition, 15);
       rightPosition = 15;
     }
-    
+
     // Apply positioning with fallback
     try {
       microContainer.style.setProperty('top', `${topPosition}px`, 'important');
       microContainer.style.setProperty('right', `${rightPosition}px`, 'important');
-      
+
       // Ensure it's above all YouTube elements
       microContainer.style.setProperty('z-index', '10001', 'important');
       microContainer.style.setProperty('position', 'fixed', 'important');
@@ -794,11 +762,11 @@ class ViewMax {
     if (!this.microToggleElement) {
       this.createMicroToggle();
     }
-    
+
     if (this.microToggleElement) {
       // Update position before showing
       this.updateMicroTogglePosition(this.microToggleElement);
-      
+
       // Show with animation
       this.microToggleElement.classList.remove('viewmax-micro-hide');
       this.microToggleElement.classList.add('viewmax-micro-show');
@@ -812,7 +780,7 @@ class ViewMax {
       // Hide with animation
       this.microToggleElement.classList.remove('viewmax-micro-show');
       this.microToggleElement.classList.add('viewmax-micro-hide');
-      
+
       // Hide after animation completes
       setTimeout(() => {
         if (this.microToggleElement) {
@@ -820,7 +788,7 @@ class ViewMax {
           this.microToggleElement.classList.remove('viewmax-micro-hide');
         }
       }, 300);
-      
+
       console.log("ViewMax: Micro toggle hidden");
     }
   }
@@ -830,7 +798,7 @@ class ViewMax {
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
     }
-    
+
     // Clean up timeline observer
     if (this.timelineObserver) {
       this.timelineObserver.disconnect();
@@ -849,14 +817,14 @@ class ViewMax {
       }
       this.microToggleEventHandler = null;
     }
-    
+
     if (this.microToggleElement) {
       this.microToggleElement.remove();
       this.microToggleElement = null;
     }
 
 
-    
+
     // Reset processing flags
     this.microToggleProcessing = false;
   }
@@ -915,7 +883,7 @@ class ViewMax {
     if (!document.getElementById('viewmax-toggle')) {
       this.createToggle();
     }
-    
+
     // Handle responsive toggle positioning
     this.handleResponsiveTogglePosition();
 
