@@ -28,7 +28,6 @@ ViewMax is a sophisticated Chrome extension that revolutionizes YouTube viewing 
 
 ### ⌨️ **Enhanced User Experience**
 - **Keyboard Shortcut**: `Ctrl+Shift+F` for instant toggle
-- **Persistent Memory**: Remembers preferences across video navigation
 - **Visual Feedback**: "Ready" and "Active" status indicators
 - **Interactive Effects**: Mouse tracking with radial gradient hover effects
 
@@ -112,7 +111,7 @@ ViewMax/
 - **Manifest V3**: Latest Chrome extension standard
 - **ES6+ JavaScript**: Modern async/await patterns
 - **Advanced CSS**: Flexbox, Grid, Custom Properties
-- **Chrome APIs**: Storage, Scripting, Commands
+- **Chrome APIs**: Commands
 
 ### **JavaScript Features**
 ```javascript
@@ -152,8 +151,6 @@ const debounced = this.debounce(handler, 150); // Performance optimization
 
 ### **Permissions Required**
 - `activeTab` - Access current YouTube tab
-- `scripting` - Inject content scripts
-- `storage` - Persist user preferences
 
 ### **Supported URLs**
 - `*://www.youtube.com/*` - All YouTube pages
