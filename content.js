@@ -391,39 +391,33 @@ class ViewMax {
       // Remove ViewMax CSS class
       playerContainer.classList.remove('viewmax-fullscreen');
 
+      // Clear any ViewMax-specific styles that might interfere with video rendering
+      video.style.removeProperty('object-fit');
+      video.style.removeProperty('position');
+      video.style.removeProperty('margin');
+      video.style.removeProperty('display');
+      video.style.removeProperty('width');
+      video.style.removeProperty('height');
+      video.style.removeProperty('filter');
+      video.style.removeProperty('transform');
+      video.style.removeProperty('opacity');
+
       // Restore original styles ONLY (don't clear everything)
       this.restoreOriginalStyles(playerContainer);
       this.restoreOriginalStyles(video);
       if (videoContainer) {
         this.restoreOriginalStyles(videoContainer);
+        // Clear container styles that might interfere
+        videoContainer.style.removeProperty('display');
+        videoContainer.style.removeProperty('align-items');
+        videoContainer.style.removeProperty('justify-content');
       }
 
       // Reset only ViewMax-specific control modifications
       this.resetViewMaxControlStyles();
 
-      // Gentle video restoration without breaking YouTube's rendering
-      setTimeout(() => {
-        // Only restore playback state if it changed
-        if (Math.abs(video.currentTime - currentTime) > 0.1) {
-          video.currentTime = currentTime;
-        }
-        if (video.volume !== volume) {
-          video.volume = volume;
-        }
-        if (video.playbackRate !== playbackRate) {
-          video.playbackRate = playbackRate;
-        }
-
-        // Resume playback if it was playing
-        if (!isPaused && video.paused) {
-          video.play().catch(() => {
-            console.log('ViewMax: Could not resume playback');
-          });
-        }
-
-        // Trigger a single resize event to let YouTube recalculate
-        window.dispatchEvent(new Event('resize', { bubbles: true }));
-      }, 50);
+      // Force complete video refresh to prevent black screen
+      this.forceVideoRefresh(video, currentTime, isPaused, volume, playbackRate);
 
       // Update toggle status and show main toggle when ViewMax is disabled
       if (this.toggleElement) {
@@ -440,6 +434,81 @@ class ViewMax {
         }
       }
     }
+  }
+
+  forceVideoRefresh(video, currentTime, isPaused, volume, playbackRate) {
+    console.log('ViewMax: Soft refreshing video element');
+
+    // Soft reflow to make the browser recompute layout
+    video.style.display = 'none';
+    video.offsetHeight; // Force reflow
+    video.style.display = '';
+
+    // Recalculate layout without touching the media pipeline
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize', { bubbles: true }));
+    });
+
+    // Restore playback state
+    setTimeout(() => {
+      if (Math.abs(video.currentTime - currentTime) > 0.1) {
+        video.currentTime = currentTime;
+      }
+      if (video.volume !== volume) {
+        video.volume = volume;
+      }
+      if (video.playbackRate !== playbackRate) {
+        video.playbackRate = playbackRate;
+      }
+
+      if (!isPaused && video.paused) {
+        // Prefer YouTube's player API when available
+        const ytPlayer = document.querySelector('#movie_player');
+        if (ytPlayer && ytPlayer.playVideo) {
+          try {
+            ytPlayer.seekTo(currentTime, true);
+            ytPlayer.playVideo();
+          } catch (e) {
+            video.play().catch(() => console.log('ViewMax: Could not resume playback'));
+          }
+        } else {
+          video.play().catch(() => console.log('ViewMax: Could not resume playback'));
+        }
+      }
+
+      // Extra resize events to help controls settle
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize', { bubbles: true }));
+      }, 100);
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize', { bubbles: true }));
+      }, 300);
+    }, 100);
+
+    // Fallback: if video is still not rendered, poke the player API (no src changes)
+    setTimeout(() => {
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        console.log('ViewMax: Video still needs refresh; using player API fallback');
+        const ytPlayer = document.querySelector('#movie_player');
+        if (ytPlayer && ytPlayer.getPlayerState) {
+          try {
+            ytPlayer.seekTo(currentTime, true);
+            if (!isPaused) {
+              ytPlayer.playVideo();
+            }
+          } catch (e) {
+            console.log('ViewMax: YouTube player API not available');
+          }
+        } else {
+          // Light click to prompt YouTube to redraw
+          video.dispatchEvent(new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+          }));
+        }
+      }
+    }, 500);
   }
 
   resetViewMaxControlStyles() {
@@ -1143,6 +1212,12 @@ class ViewMax {
 
       // Small delay to let YouTube settle after fullscreen exit
       setTimeout(() => {
+        // Abort if mode was turned OFF meanwhile (prevents race)
+        if (!this.isFullWebMode) {
+          console.log('ViewMax: Skip fullscreen-exit recovery because mode is OFF');
+          return;
+        }
+
         const video = document.querySelector('video');
         const playerContainer = document.querySelector('#movie_player');
 
@@ -1150,24 +1225,21 @@ class ViewMax {
           // Store current state
           const currentTime = video.currentTime;
           const isPaused = video.paused;
+          const volume = video.volume;
+          const playbackRate = video.playbackRate;
 
-          // Gently clear any problematic styles without breaking video
+          // Clear any problematic styles that might interfere with video rendering
           video.style.removeProperty('filter');
           video.style.removeProperty('transform');
           video.style.removeProperty('opacity');
+          video.style.removeProperty('width');
+          video.style.removeProperty('height');
 
           // Re-apply ViewMax class
           playerContainer.classList.add('viewmax-fullscreen');
 
-          // Restore playback state if needed
-          if (Math.abs(video.currentTime - currentTime) > 0.1) {
-            video.currentTime = currentTime;
-          }
-          if (!isPaused && video.paused) {
-            video.play().catch(() => {
-              console.log('ViewMax: Could not resume playback after fullscreen exit');
-            });
-          }
+          // Soft refresh after fullscreen exit
+          this.forceVideoRefresh(video, currentTime, isPaused, volume, playbackRate);
 
           // Update controls
           this.updateControlsResponsiveness();
