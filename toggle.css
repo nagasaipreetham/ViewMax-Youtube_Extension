@@ -144,6 +144,10 @@ input:checked~.viewmax-switch {
   width: 100vw !important;
   height: 100vh !important;
   object-fit: contain !important;
+  filter: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 #movie_player.viewmax-fullscreen .html5-video-container {
@@ -357,6 +361,74 @@ input:checked~.viewmax-switch {
   .viewmax-toggle-sidebar .viewmax-status-indicator {
     font-size: 9px;
     min-width: 60px;
+  }
+}
+
+/* Ensure toggle is always visible and properly positioned */
+#viewmax-toggle {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 1000 !important;
+}
+
+/* Force visibility in all scenarios */
+#viewmax-toggle:not([style*="display: none"]) {
+  display: flex !important;
+}
+
+/* Prevent YouTube from hiding our toggle */
+#viewmax-toggle[hidden] {
+  display: flex !important;
+}
+
+/* Fix for very small windows */
+@media (max-width: 400px) {
+  #viewmax-toggle {
+    min-width: 200px !important;
+    max-width: calc(100vw - 24px) !important;
+    font-size: 12px !important;
+    padding: 6px 10px !important;
+    margin: 6px 12px !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 1000 !important;
+  }
+  
+  .viewmax-label {
+    font-size: 14px !important;
+    display: block !important;
+  }
+  
+  .viewmax-logo {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  
+  .viewmax-status-indicator {
+    font-size: 8px !important;
+    min-width: 25px !important;
+  }
+}
+
+/* Additional small window fixes */
+@media (max-width: 320px) {
+  #viewmax-toggle {
+    min-width: 180px !important;
+    padding: 4px 8px !important;
+    margin: 4px 8px !important;
+  }
+  
+  .viewmax-label {
+    font-size: 12px !important;
+  }
+  
+  .viewmax-logo {
+    width: 18px !important;
+    height: 18px !important;
   }
 }
 

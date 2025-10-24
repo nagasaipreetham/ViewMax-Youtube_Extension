@@ -7,23 +7,76 @@ class ViewMax {
     this.microToggleEventHandler = null;
     this.hiddenElements = [];
     this.originalStyles = new Map();
+    this.mouseTrackingAdded = false;
+    this.fullscreenChangeHandler = null;
     this.init();
   }
 
   async init() {
-    // Only run on video pages (URLs containing watch?v=)
-    if (!this.isVideoPage()) {
-      console.log('ViewMax: Not on video page, skipping initialization');
-      return;
-    }
+    console.log('ViewMax: Initializing extension...');
 
-    // Wait for YouTube to load
+    // Always initialize the extension, but handle video pages specially
+    this.setupGlobalListeners();
+
+    // Wait for YouTube to load initially
     await this.waitForYouTube();
 
+    // Check if we're on a video page and initialize accordingly
+    if (this.isVideoPage()) {
+      await this.initializeForVideoPage();
+    } else {
+      // On non-video pages, just observe for navigation to video pages
+      console.log('ViewMax: Not on video page, waiting for navigation...');
+    }
 
+    // Listen for navigation changes (this handles YouTube SPA navigation)
+    this.observeNavigation();
+  }
 
-    // Create toggle
-    this.createToggle();
+  setupGlobalListeners() {
+    // Keyboard shortcut (global)
+    document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+
+    // Listen for messages from background script
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message.action === 'toggle-viewmax') {
+        this.toggleMode();
+        sendResponse({ success: true });
+      }
+    });
+
+    // Listen for window resize with debouncing
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        this.handleResize();
+        this.handleResponsiveTogglePosition();
+      }, 100);
+    });
+
+    // Listen for fullscreen changes to handle conflicts
+    this.fullscreenChangeHandler = () => {
+      console.log('ViewMax: Fullscreen change detected');
+      if (this.isFullWebMode) {
+        // If we're in ViewMax mode and user exits fullscreen, we need to restore ViewMax properly
+        setTimeout(() => {
+          this.handleFullscreenExit();
+        }, 100);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', this.fullscreenChangeHandler);
+    document.addEventListener('webkitfullscreenchange', this.fullscreenChangeHandler);
+    document.addEventListener('mozfullscreenchange', this.fullscreenChangeHandler);
+    document.addEventListener('MSFullscreenChange', this.fullscreenChangeHandler);
+  }
+
+  async initializeForVideoPage() {
+    console.log('ViewMax: Initializing for video page...');
+
+    // Create toggle with retry mechanism
+    await this.createToggleWithRetry();
 
     // Create micro toggle (initially hidden)
     this.createMicroToggle();
@@ -36,29 +89,13 @@ class ViewMax {
       this.hideMicroToggle();
       // Ensure main toggle is visible when ViewMax is not active
       if (this.toggleElement) {
-        this.toggleElement.style.display = 'flex';
+        this.ensureToggleVisibility();
+        // Force responsive positioning after creation
+        setTimeout(() => {
+          this.handleResponsiveTogglePosition();
+        }, 200);
       }
     }
-
-    // Listen for navigation changes
-    this.observeNavigation();
-
-    // Listen for window resize
-    window.addEventListener('resize', () => {
-      this.handleResize();
-      this.handleResponsiveTogglePosition();
-    });
-
-    // Keyboard shortcut
-    document.addEventListener('keydown', (e) => this.handleKeyboard(e));
-
-    // Listen for messages from background script
-    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (message.action === 'toggle-viewmax') {
-        this.toggleMode();
-        sendResponse({ success: true });
-      }
-    });
   }
 
   isVideoPage() {
@@ -68,11 +105,21 @@ class ViewMax {
 
   waitForYouTube() {
     return new Promise((resolve) => {
+      let attempts = 0;
+      const maxAttempts = 20; // 10 seconds max wait
+
       const checkForVideo = () => {
+        attempts++;
         const videoElement = document.querySelector('video');
         const playerContainer = document.querySelector('#movie_player, .html5-video-player');
+        const ytdApp = document.querySelector('ytd-app');
 
-        if (videoElement && playerContainer) {
+        // Check if basic YouTube structure is loaded
+        if (ytdApp && (videoElement || !this.isVideoPage())) {
+          console.log('ViewMax: YouTube structure loaded');
+          resolve();
+        } else if (attempts >= maxAttempts) {
+          console.log('ViewMax: Max attempts reached, proceeding anyway');
           resolve();
         } else {
           setTimeout(checkForVideo, 500);
@@ -84,77 +131,152 @@ class ViewMax {
 
 
 
-  createToggle() {
-    // Load fonts first like audio enhancer
-    const fontLink = document.createElement("link");
-    fontLink.rel = "stylesheet";
-    fontLink.href = "https://fonts.googleapis.com/css2?family=Galada&family=Poppins:ital,wght@0,300;0,400;1,300;1,400&display=swap";
-    document.head.appendChild(fontLink);
+  async createToggleWithRetry() {
+    let attempts = 0;
+    const maxAttempts = 10;
 
-    // Remove existing toggle if present
-    const existingToggle = document.getElementById('viewmax-toggle');
-    if (existingToggle) {
-      existingToggle.remove();
-    }
-
-    // Find the sidebar exactly like the audio enhancer
-    const sidebar = document.querySelector('#secondary');
-    if (!sidebar) {
-      console.log("ViewMax: Sidebar not found, retrying...");
-      setTimeout(() => this.createToggle(), 500);
-      return;
-    }
-
-    console.log("ViewMax: Injecting UI...");
-
-    // Create toggle container exactly like audio enhancer
-    const container = document.createElement("div");
-    container.id = "viewmax-toggle";
-    container.setAttribute('data-status', this.isFullWebMode ? 'active' : 'inactive');
-
-    container.innerHTML = `
-      <div class="viewmax-ui">
-        <img src="${chrome.runtime.getURL('icon.png')}" class="viewmax-logo" />
-        <span class="viewmax-label">ViewMax</span>
-        <div class="viewmax-controls">
-          <div class="viewmax-status-indicator" id="viewmaxStatus">${this.isFullWebMode ? 'Active' : 'Ready'}</div>
-          <label class="viewmax-switch">
-            <input type="checkbox" id="viewmax-checkbox" ${this.isFullWebMode ? 'checked' : ''}>
-            <span class="viewmax-slider"></span>
-          </label>
-        </div>
-      </div>
-    `;
-
-    // Insert at the top of sidebar like audio enhancer
-    sidebar.prepend(container);
-
-    // Add event listeners
-    const toggle = document.getElementById("viewmax-checkbox");
-
-    toggle.addEventListener("change", (e) => {
-      console.log("ViewMax: Toggle changed:", e.target.checked);
-      this.toggleMode();
-    });
-
-    // Add global mouse tracking for hover effect
-    document.addEventListener('mousemove', (e) => {
-      const overlay = document.getElementById('viewmax-toggle');
-      if (overlay) {
-        const rect = overlay.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        overlay.style.setProperty('--mouse-x', `${x}px`);
-        overlay.style.setProperty('--mouse-y', `${y}px`);
+    while (attempts < maxAttempts) {
+      try {
+        if (await this.createToggle()) {
+          return true;
+        }
+      } catch (error) {
+        console.log(`ViewMax: Toggle creation attempt ${attempts + 1} failed:`, error);
       }
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    console.log('ViewMax: Failed to create toggle after max attempts');
+    return false;
+  }
+
+  createToggle() {
+    return new Promise((resolve) => {
+      // Load fonts first
+      if (!document.querySelector('link[href*="Galada"]')) {
+        const fontLink = document.createElement("link");
+        fontLink.rel = "stylesheet";
+        fontLink.href = "https://fonts.googleapis.com/css2?family=Galada&family=Poppins:ital,wght@0,300;0,400;1,300;1,400&display=swap";
+        document.head.appendChild(fontLink);
+      }
+
+      // Remove ALL existing toggles to prevent duplicates
+      const existingToggles = document.querySelectorAll('#viewmax-toggle, [id^="viewmax-toggle"]');
+      existingToggles.forEach(toggle => {
+        console.log('ViewMax: Removing existing toggle');
+        toggle.remove();
+      });
+
+      // Enhanced sidebar detection with more selectors and fallbacks
+      const sidebarSelectors = [
+        '#secondary',
+        '#secondary-inner',
+        'ytd-watch-next-secondary-results-renderer',
+        '#related',
+        'ytd-secondary-pyv-renderer',
+        '#watch-sidebar',
+        '.watch-sidebar'
+      ];
+
+      let sidebar = null;
+      let fallbackContainer = null;
+
+      // Try to find sidebar
+      for (const selector of sidebarSelectors) {
+        sidebar = document.querySelector(selector);
+        if (sidebar) {
+          console.log(`ViewMax: Found sidebar using selector: ${selector}`);
+          break;
+        }
+      }
+
+      // If no sidebar found, try fallback locations
+      if (!sidebar) {
+        const playerDiv = document.querySelector('#player');
+        const watchFlexy = document.querySelector('ytd-watch-flexy');
+
+        if (playerDiv) {
+          fallbackContainer = playerDiv;
+          console.log("ViewMax: Using player div as fallback container");
+        } else if (watchFlexy) {
+          fallbackContainer = watchFlexy;
+          console.log("ViewMax: Using watch-flexy as fallback container");
+        }
+      }
+
+      const targetContainer = sidebar || fallbackContainer;
+
+      if (!targetContainer) {
+        console.log("ViewMax: No suitable container found, will retry...");
+        resolve(false);
+        return;
+      }
+
+      console.log("ViewMax: Injecting UI...");
+
+      // Create toggle container
+      const container = document.createElement("div");
+      container.id = "viewmax-toggle";
+      container.setAttribute('data-status', this.isFullWebMode ? 'active' : 'inactive');
+
+      container.innerHTML = `
+        <div class="viewmax-ui">
+          <img src="${chrome.runtime.getURL('icon.png')}" class="viewmax-logo" />
+          <span class="viewmax-label">ViewMax</span>
+          <div class="viewmax-controls">
+            <div class="viewmax-status-indicator" id="viewmaxStatus">${this.isFullWebMode ? 'Active' : 'Ready'}</div>
+            <label class="viewmax-switch">
+              <input type="checkbox" id="viewmax-checkbox" ${this.isFullWebMode ? 'checked' : ''}>
+              <span class="viewmax-slider"></span>
+            </label>
+          </div>
+        </div>
+      `;
+
+      // Insert based on container type
+      if (sidebar) {
+        sidebar.prepend(container);
+      } else {
+        // For fallback containers, insert after the element
+        targetContainer.insertAdjacentElement('afterend', container);
+        container.classList.add('viewmax-toggle-below-player');
+      }
+
+      // Add event listeners
+      const toggle = document.getElementById("viewmax-checkbox");
+      if (toggle) {
+        toggle.addEventListener("change", (e) => {
+          console.log("ViewMax: Toggle changed:", e.target.checked);
+          this.toggleMode();
+        });
+      }
+
+      // Add global mouse tracking for hover effect
+      if (!this.mouseTrackingAdded) {
+        document.addEventListener('mousemove', (e) => {
+          const overlay = document.getElementById('viewmax-toggle');
+          if (overlay) {
+            const rect = overlay.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            overlay.style.setProperty('--mouse-x', `${x}px`);
+            overlay.style.setProperty('--mouse-y', `${y}px`);
+          }
+        });
+        this.mouseTrackingAdded = true;
+      }
+
+      this.toggleElement = container;
+
+      // Handle initial responsive positioning
+      setTimeout(() => {
+        this.handleResponsiveTogglePosition();
+      }, 100);
+
+      console.log("✅ ViewMax UI injected successfully");
+      resolve(true);
     });
-
-    this.toggleElement = container;
-
-    // Handle initial responsive positioning
-    this.handleResponsiveTogglePosition();
-
-    console.log("✅ ViewMax UI injected successfully");
   }
 
   getToggleClass() {
@@ -260,41 +382,48 @@ class ViewMax {
     const videoContainer = document.querySelector('.html5-video-container');
 
     if (playerContainer && video) {
-      // Remove CSS class first
+      // Store current playback state
+      const currentTime = video.currentTime;
+      const isPaused = video.paused;
+      const volume = video.volume;
+      const playbackRate = video.playbackRate;
+
+      // Remove ViewMax CSS class
       playerContainer.classList.remove('viewmax-fullscreen');
 
-      // Restore original styles using stored values
+      // Restore original styles ONLY (don't clear everything)
       this.restoreOriginalStyles(playerContainer);
       this.restoreOriginalStyles(video);
       if (videoContainer) {
         this.restoreOriginalStyles(videoContainer);
       }
 
-      // Reset all control elements completely
-      this.resetAllControlStyles();
+      // Reset only ViewMax-specific control modifications
+      this.resetViewMaxControlStyles();
 
-      // Clear any inline styles that might interfere with restoration
-      video.style.removeProperty('object-fit');
-      video.style.removeProperty('width');
-      video.style.removeProperty('height');
-
-      // Force YouTube to recalculate video size properly with multiple fallbacks
+      // Gentle video restoration without breaking YouTube's rendering
       setTimeout(() => {
-        // Trigger resize event to force YouTube to recalculate
-        const resizeEvent = new Event('resize', { bubbles: true });
-        window.dispatchEvent(resizeEvent);
-
-        // Additional fallback - trigger on video element
-        if (video.dispatchEvent) {
-          video.dispatchEvent(new Event('resize'));
+        // Only restore playback state if it changed
+        if (Math.abs(video.currentTime - currentTime) > 0.1) {
+          video.currentTime = currentTime;
         }
-      }, 100);
+        if (video.volume !== volume) {
+          video.volume = volume;
+        }
+        if (video.playbackRate !== playbackRate) {
+          video.playbackRate = playbackRate;
+        }
 
-      // Second attempt after a longer delay
-      setTimeout(() => {
-        const resizeEvent = new Event('resize', { bubbles: true });
-        window.dispatchEvent(resizeEvent);
-      }, 300);
+        // Resume playback if it was playing
+        if (!isPaused && video.paused) {
+          video.play().catch(() => {
+            console.log('ViewMax: Could not resume playback');
+          });
+        }
+
+        // Trigger a single resize event to let YouTube recalculate
+        window.dispatchEvent(new Event('resize', { bubbles: true }));
+      }, 50);
 
       // Update toggle status and show main toggle when ViewMax is disabled
       if (this.toggleElement) {
@@ -302,6 +431,9 @@ class ViewMax {
         this.toggleElement.style.zIndex = '';
         // Show main toggle when ViewMax is disabled
         this.toggleElement.style.display = 'flex';
+        this.toggleElement.style.visibility = 'visible';
+        this.toggleElement.style.opacity = '1';
+
         const statusIndicator = document.getElementById('viewmaxStatus');
         if (statusIndicator) {
           statusIndicator.textContent = 'Ready';
@@ -310,8 +442,8 @@ class ViewMax {
     }
   }
 
-  resetAllControlStyles() {
-    // List of all control selectors that might have been modified
+  resetViewMaxControlStyles() {
+    // Only reset styles that ViewMax specifically modified
     const controlSelectors = [
       '.ytp-chrome-bottom',
       '.ytp-progress-bar-container',
@@ -320,17 +452,25 @@ class ViewMax {
       '.ytp-left-controls',
       '.ytp-right-controls',
       '.ytp-progress-bar-padding',
-      '.ytp-scrubber-container',
-      '.ytp-play-progress',
-      '.ytp-load-progress'
+      '.ytp-scrubber-container'
     ];
 
-    // Reset all control elements
+    // Only remove ViewMax-specific style properties
     controlSelectors.forEach(selector => {
       const elements = document.querySelectorAll(selector);
       elements.forEach(element => {
-        element.style.cssText = '';
-        element.removeAttribute('style');
+        // Remove only the specific properties ViewMax sets
+        const viewMaxProperties = [
+          'width', 'max-width', 'flex', 'min-width', 'margin',
+          'box-sizing', 'flex-shrink', 'justify-content'
+        ];
+
+        viewMaxProperties.forEach(prop => {
+          element.style.removeProperty(prop);
+        });
+
+        // Remove ViewMax-specific classes
+        element.classList.remove('viewmax-modified');
       });
     });
   }
@@ -532,19 +672,29 @@ class ViewMax {
   }
 
   storeOriginalStyles(element) {
-    if (!element) return;
+    if (!element || this.originalStyles.has(element)) return;
 
-    const styles = [
-      'position', 'top', 'left', 'width', 'height', 'zIndex', 'backgroundColor',
-      'display', 'alignItems', 'justifyContent', 'objectFit', 'maxWidth', 'maxHeight'
-    ];
+    // Store the complete computed styles that we might modify
+    const computedStyles = window.getComputedStyle(element);
     const originalStyles = {};
 
-    styles.forEach(style => {
-      originalStyles[style] = element.style[style] || '';
+    const stylesToStore = [
+      'position', 'top', 'left', 'right', 'bottom', 'width', 'height',
+      'zIndex', 'backgroundColor', 'display', 'alignItems', 'justifyContent',
+      'objectFit', 'maxWidth', 'maxHeight', 'minWidth', 'minHeight',
+      'transform', 'filter', 'opacity'
+    ];
+
+    stylesToStore.forEach(style => {
+      // Store both inline and computed values
+      originalStyles[style] = {
+        inline: element.style[style] || '',
+        computed: computedStyles[style] || ''
+      };
     });
 
     this.originalStyles.set(element, originalStyles);
+    console.log('ViewMax: Stored original styles for element:', element.tagName);
   }
 
   restoreOriginalStyles(element) {
@@ -553,8 +703,15 @@ class ViewMax {
     const originalStyles = this.originalStyles.get(element);
     if (originalStyles) {
       Object.keys(originalStyles).forEach(style => {
-        element.style[style] = originalStyles[style];
+        // Restore the original inline style
+        const originalValue = originalStyles[style].inline || '';
+        if (originalValue) {
+          element.style[style] = originalValue;
+        } else {
+          element.style.removeProperty(style);
+        }
       });
+      console.log('ViewMax: Restored original styles for element:', element.tagName);
     }
   }
 
@@ -628,7 +785,10 @@ class ViewMax {
   }
 
   handleResponsiveTogglePosition() {
-    if (!this.toggleElement) return;
+    if (!this.toggleElement) {
+      console.log('ViewMax: No toggle element found for responsive positioning');
+      return;
+    }
 
     const viewportWidth = window.innerWidth;
     console.log(`ViewMax: Handling responsive toggle position for width: ${viewportWidth}px`);
@@ -639,61 +799,191 @@ class ViewMax {
       return;
     }
 
-    if (viewportWidth <= 1015) {
+    // Force visibility first - critical for small windows
+    this.ensureToggleVisibility();
+
+    // Force responsive positioning based on viewport
+    if (viewportWidth <= 1000) {
       // Small/Medium screens: Move toggle below player
       this.moveToggleBelowPlayer();
     } else {
       // Large screens: Move toggle back to sidebar
       this.moveToggleToSidebar();
     }
+
+    // Additional fixes for very small screens
+    if (viewportWidth <= 400) {
+      this.applySmallScreenFixes();
+    }
+  }
+
+  ensureToggleVisibility() {
+    if (!this.toggleElement) return;
+
+    // Force visibility with multiple approaches
+    this.toggleElement.style.setProperty('display', 'flex', 'important');
+    this.toggleElement.style.setProperty('visibility', 'visible', 'important');
+    this.toggleElement.style.setProperty('opacity', '1', 'important');
+    this.toggleElement.style.setProperty('position', 'relative', 'important');
+    this.toggleElement.style.setProperty('z-index', '1000', 'important');
+
+    // Remove any hidden attributes
+    this.toggleElement.removeAttribute('hidden');
+    this.toggleElement.classList.remove('hidden');
+
+    // Ensure it's not being hidden by YouTube
+    this.toggleElement.style.setProperty('pointer-events', 'auto', 'important');
+
+    console.log('ViewMax: Toggle visibility enforced');
+  }
+
+  applySmallScreenFixes() {
+    if (!this.toggleElement) return;
+
+    // Special handling for very small screens
+    this.toggleElement.style.setProperty('min-width', '200px', 'important');
+    this.toggleElement.style.setProperty('font-size', '12px', 'important');
+    this.toggleElement.style.setProperty('padding', '6px 10px', 'important');
+    this.toggleElement.style.setProperty('margin', '6px 12px', 'important');
+
+    // Ensure it doesn't get cut off
+    this.toggleElement.style.setProperty('max-width', 'calc(100vw - 24px)', 'important');
+    this.toggleElement.style.setProperty('box-sizing', 'border-box', 'important');
+
+    console.log('ViewMax: Small screen fixes applied');
   }
 
   moveToggleBelowPlayer() {
     if (!this.toggleElement) return;
 
-    // Find the player div
-    const playerDiv = document.querySelector('#player');
-    if (!playerDiv) {
-      console.log("ViewMax: Player div not found, retrying...");
-      setTimeout(() => this.moveToggleBelowPlayer(), 500);
-      return;
+    // Try multiple selectors for player container with priority order
+    const playerSelectors = [
+      '#player',
+      '#movie_player',
+      '.html5-video-player',
+      'ytd-player',
+      '#primary',
+      'ytd-watch-flexy #primary'
+    ];
+    let playerDiv = null;
+
+    for (const selector of playerSelectors) {
+      playerDiv = document.querySelector(selector);
+      if (playerDiv) {
+        console.log(`ViewMax: Found player container: ${selector}`);
+        break;
+      }
     }
 
-    // Remove from current parent
-    this.toggleElement.remove();
+    if (!playerDiv) {
+      console.log("ViewMax: Player div not found, using fallback positioning");
+      // Enhanced fallback options
+      const fallbackSelectors = [
+        'ytd-watch-flexy',
+        '#content',
+        'ytd-page-manager',
+        'body'
+      ];
 
-    // Add responsive class for styling
-    this.toggleElement.classList.add('viewmax-toggle-below-player');
-    this.toggleElement.classList.remove('viewmax-toggle-sidebar');
+      for (const selector of fallbackSelectors) {
+        playerDiv = document.querySelector(selector);
+        if (playerDiv) {
+          console.log(`ViewMax: Using fallback container: ${selector}`);
+          break;
+        }
+      }
 
-    // Insert after the player div
-    playerDiv.insertAdjacentElement('afterend', this.toggleElement);
+      if (!playerDiv) {
+        setTimeout(() => this.moveToggleBelowPlayer(), 500);
+        return;
+      }
+    }
 
-    console.log("ViewMax: Toggle moved below player");
+    // Store current parent to avoid unnecessary DOM manipulation
+    const currentParent = this.toggleElement.parentNode;
+    const isAlreadyBelowPlayer = this.toggleElement.classList.contains('viewmax-toggle-below-player') &&
+      playerDiv.parentNode && playerDiv.parentNode.contains(this.toggleElement);
+
+    // Only move if it's not already in the right position
+    if (!isAlreadyBelowPlayer) {
+      // Remove from current parent
+      this.toggleElement.remove();
+
+      // Add responsive class for styling
+      this.toggleElement.classList.add('viewmax-toggle-below-player');
+      this.toggleElement.classList.remove('viewmax-toggle-sidebar');
+
+      // Try to insert after the player div, with fallback
+      try {
+        playerDiv.insertAdjacentElement('afterend', this.toggleElement);
+      } catch (error) {
+        // Fallback: append to player's parent
+        if (playerDiv.parentNode) {
+          playerDiv.parentNode.appendChild(this.toggleElement);
+        } else {
+          document.body.appendChild(this.toggleElement);
+        }
+      }
+
+      console.log("ViewMax: Toggle moved below player");
+    }
+
+    // Force visibility after positioning
+    this.ensureToggleVisibility();
   }
 
   moveToggleToSidebar() {
     if (!this.toggleElement) return;
 
-    // Find the sidebar
-    const sidebar = document.querySelector('#secondary');
+    // Enhanced sidebar detection with more selectors
+    const sidebarSelectors = [
+      '#secondary',
+      '#secondary-inner',
+      'ytd-watch-next-secondary-results-renderer',
+      '#related',
+      'ytd-secondary-pyv-renderer',
+      '#watch-sidebar',
+      '.watch-sidebar',
+      'ytd-watch-flexy #secondary'
+    ];
+    let sidebar = null;
+
+    for (const selector of sidebarSelectors) {
+      sidebar = document.querySelector(selector);
+      if (sidebar) {
+        console.log(`ViewMax: Found sidebar: ${selector}`);
+        break;
+      }
+    }
+
     if (!sidebar) {
-      console.log("ViewMax: Sidebar not found, retrying...");
-      setTimeout(() => this.moveToggleToSidebar(), 500);
+      console.log("ViewMax: Sidebar not found, keeping current position");
+      // Don't return - still ensure visibility
+      this.ensureToggleVisibility();
       return;
     }
 
-    // Remove from current parent
-    this.toggleElement.remove();
+    // Check if already in correct position
+    const isAlreadyInSidebar = sidebar.contains(this.toggleElement) &&
+      this.toggleElement.classList.contains('viewmax-toggle-sidebar');
 
-    // Add sidebar class for styling
-    this.toggleElement.classList.add('viewmax-toggle-sidebar');
-    this.toggleElement.classList.remove('viewmax-toggle-below-player');
+    // Only move if it's not already in the sidebar
+    if (!isAlreadyInSidebar) {
+      // Remove from current parent
+      this.toggleElement.remove();
 
-    // Insert at the top of sidebar
-    sidebar.prepend(this.toggleElement);
+      // Add sidebar class for styling
+      this.toggleElement.classList.add('viewmax-toggle-sidebar');
+      this.toggleElement.classList.remove('viewmax-toggle-below-player');
 
-    console.log("ViewMax: Toggle moved to sidebar");
+      // Insert at the top of sidebar
+      sidebar.prepend(this.toggleElement);
+
+      console.log("ViewMax: Toggle moved to sidebar");
+    }
+
+    // Force visibility after positioning
+    this.ensureToggleVisibility();
   }
 
 
@@ -776,9 +1066,11 @@ class ViewMax {
     }
   }
 
-  cleanup() {
+  cleanup(removeGlobalListeners = true) {
+    console.log('ViewMax: Cleaning up...');
+
     // Clean up event listeners
-    if (this.resizeHandler) {
+    if (this.resizeHandler && removeGlobalListeners) {
       window.removeEventListener('resize', this.resizeHandler);
     }
 
@@ -806,10 +1098,18 @@ class ViewMax {
       this.microToggleElement = null;
     }
 
-
+    // Clean up main toggle
+    if (this.toggleElement && this.toggleElement.parentNode) {
+      this.toggleElement.remove();
+      this.toggleElement = null;
+    }
 
     // Reset processing flags
     this.microToggleProcessing = false;
+
+    // Clear stored styles
+    this.originalStyles.clear();
+    this.hiddenElements = [];
   }
 
   handleKeyboard(e) {
@@ -818,7 +1118,61 @@ class ViewMax {
       e.preventDefault();
       e.stopPropagation();
       console.log('ViewMax: Keyboard shortcut triggered');
-      this.toggleMode();
+
+      // Only allow toggle on video pages
+      if (this.isVideoPage()) {
+        // Add a small delay to prevent conflicts with browser fullscreen
+        setTimeout(() => {
+          this.toggleMode();
+        }, 50);
+      } else {
+        console.log('ViewMax: Keyboard shortcut ignored - not on video page');
+      }
+    }
+  }
+
+  handleFullscreenExit() {
+    // Check if we're no longer in fullscreen but ViewMax is still active
+    const isInFullscreen = document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement;
+
+    if (!isInFullscreen && this.isFullWebMode) {
+      console.log('ViewMax: Handling fullscreen exit while in ViewMax mode');
+
+      // Small delay to let YouTube settle after fullscreen exit
+      setTimeout(() => {
+        const video = document.querySelector('video');
+        const playerContainer = document.querySelector('#movie_player');
+
+        if (video && playerContainer) {
+          // Store current state
+          const currentTime = video.currentTime;
+          const isPaused = video.paused;
+
+          // Gently clear any problematic styles without breaking video
+          video.style.removeProperty('filter');
+          video.style.removeProperty('transform');
+          video.style.removeProperty('opacity');
+
+          // Re-apply ViewMax class
+          playerContainer.classList.add('viewmax-fullscreen');
+
+          // Restore playback state if needed
+          if (Math.abs(video.currentTime - currentTime) > 0.1) {
+            video.currentTime = currentTime;
+          }
+          if (!isPaused && video.paused) {
+            video.play().catch(() => {
+              console.log('ViewMax: Could not resume playback after fullscreen exit');
+            });
+          }
+
+          // Update controls
+          this.updateControlsResponsiveness();
+        }
+      }, 300);
     }
   }
 
@@ -826,30 +1180,63 @@ class ViewMax {
     // Watch for YouTube navigation changes
     let currentUrl = location.href;
 
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((mutations) => {
+      // Check for URL changes (YouTube SPA navigation)
       if (location.href !== currentUrl) {
+        const oldUrl = currentUrl;
         currentUrl = location.href;
+        console.log(`ViewMax: Navigation detected from ${oldUrl} to ${currentUrl}`);
 
         // Delay to allow YouTube to load new content
         setTimeout(() => {
           this.handleNavigation();
-        }, 1000);
+        }, 500);
       }
+
+      // Also watch for specific YouTube elements being added/removed
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if video player was added
+            if (node.querySelector && (node.querySelector('#movie_player') || node.id === 'movie_player')) {
+              console.log('ViewMax: Video player detected in DOM');
+              setTimeout(() => {
+                this.handleNavigation();
+              }, 300);
+            }
+          }
+        });
+      });
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+
+    // Also listen for YouTube's custom events
+    window.addEventListener('yt-navigate-finish', () => {
+      console.log('ViewMax: YouTube navigation finished');
+      setTimeout(() => {
+        this.handleNavigation();
+      }, 300);
+    });
   }
 
   async handleNavigation() {
-    // Only handle navigation if we're on a video page
+    console.log('ViewMax: Handling navigation...');
+
+    // Clean up existing state first
+    this.cleanup(false); // Don't remove global listeners
+
+    // Check if we're on a video page
     if (!this.isVideoPage()) {
+      console.log('ViewMax: Not on video page after navigation');
       // If we're leaving a video page, clean up
       const existingToggle = document.getElementById('viewmax-toggle');
       if (existingToggle) {
         existingToggle.remove();
+        this.toggleElement = null;
       }
       // Disable full web mode if it's active
       if (this.isFullWebMode) {
@@ -859,32 +1246,124 @@ class ViewMax {
       return;
     }
 
+    console.log('ViewMax: On video page, initializing...');
+
     // Wait for new video to load
     await this.waitForYouTube();
 
-    // Recreate toggles if they don't exist
-    if (!document.getElementById('viewmax-toggle')) {
-      this.createToggle();
+    // Initialize for the new video page
+    await this.initializeForVideoPage();
+  }
+}
+
+// Initialize ViewMax when page loads with better timing
+let viewMaxInstance = null;
+let initializationAttempts = 0;
+const maxInitAttempts = 5;
+
+function initializeViewMax() {
+  // Prevent multiple instances
+  if (viewMaxInstance && viewMaxInstance.toggleElement) {
+    console.log('ViewMax: Instance already exists and is functional, skipping initialization');
+    return;
+  }
+
+  initializationAttempts++;
+
+  if (viewMaxInstance) {
+    console.log('ViewMax: Instance exists but not functional, cleaning up first');
+    try {
+      viewMaxInstance.cleanup(true);
+    } catch (error) {
+      console.log('ViewMax: Error during cleanup:', error);
     }
+  }
 
-    // Handle responsive toggle positioning
-    this.handleResponsiveTogglePosition();
+  // Remove any orphaned toggles before creating new instance
+  const orphanedToggles = document.querySelectorAll('#viewmax-toggle, [id^="viewmax-toggle"]');
+  orphanedToggles.forEach(toggle => {
+    console.log('ViewMax: Removing orphaned toggle');
+    toggle.remove();
+  });
 
-    // Reapply current state
-    if (this.isFullWebMode) {
-      // Small delay to ensure elements are loaded
-      setTimeout(() => {
-        this.enableFullWebMode();
-      }, 500);
+  console.log(`ViewMax: Creating new instance (attempt ${initializationAttempts})`);
+  try {
+    viewMaxInstance = new ViewMax();
+  } catch (error) {
+    console.error('ViewMax: Failed to create instance:', error);
+    if (initializationAttempts < maxInitAttempts) {
+      setTimeout(initializeViewMax, 1000);
     }
   }
 }
 
-// Initialize ViewMax when page loads
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    new ViewMax();
+// Enhanced initialization with multiple strategies
+function setupInitialization() {
+  // Strategy 1: Standard DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeViewMax);
+  } else if (document.readyState === 'interactive') {
+    setTimeout(initializeViewMax, 100);
+  } else {
+    initializeViewMax();
+  }
+
+  // Strategy 2: YouTube-specific events
+  window.addEventListener('yt-navigate-start', () => {
+    console.log('ViewMax: YouTube navigation started');
   });
-} else {
-  new ViewMax();
+
+  window.addEventListener('yt-navigate-finish', () => {
+    console.log('ViewMax: YouTube navigation finished');
+    setTimeout(() => {
+      if (viewMaxInstance) {
+        viewMaxInstance.handleNavigation();
+      } else {
+        initializeViewMax();
+      }
+    }, 500);
+  });
+
+  window.addEventListener('yt-page-data-updated', () => {
+    console.log('ViewMax: YouTube page data updated');
+    setTimeout(() => {
+      if (viewMaxInstance) {
+        viewMaxInstance.handleNavigation();
+      }
+    }, 300);
+  });
+
+  // Strategy 3: Fallback timers
+  setTimeout(() => {
+    if (!viewMaxInstance && document.querySelector('ytd-app')) {
+      console.log('ViewMax: Fallback initialization (2s)');
+      initializeViewMax();
+    }
+  }, 2000);
+
+  setTimeout(() => {
+    if (!viewMaxInstance && document.querySelector('ytd-app')) {
+      console.log('ViewMax: Fallback initialization (5s)');
+      initializeViewMax();
+    }
+  }, 5000);
+
+  // Strategy 4: URL change detection
+  let lastUrl = location.href;
+  setInterval(() => {
+    if (location.href !== lastUrl) {
+      console.log('ViewMax: URL change detected via polling');
+      lastUrl = location.href;
+      setTimeout(() => {
+        if (viewMaxInstance) {
+          viewMaxInstance.handleNavigation();
+        } else {
+          initializeViewMax();
+        }
+      }, 1000);
+    }
+  }, 1000);
 }
+
+// Start initialization
+setupInitialization();
