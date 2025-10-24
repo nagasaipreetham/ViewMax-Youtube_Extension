@@ -9,6 +9,7 @@ class ViewMax {
     this.originalStyles = new Map();
     this.mouseTrackingAdded = false;
     this.fullscreenChangeHandler = null;
+    this.fullscreenExitTimeoutId = null;
     this.init();
   }
 
@@ -75,6 +76,9 @@ class ViewMax {
   async initializeForVideoPage() {
     console.log('ViewMax: Initializing for video page...');
 
+    // Ensure the watch page structure is ready (first-load SPA fix)
+    await this.waitForWatchPageReady();
+
     // Create toggle with retry mechanism
     await this.createToggleWithRetry();
 
@@ -87,10 +91,8 @@ class ViewMax {
       this.showMicroToggle();
     } else {
       this.hideMicroToggle();
-      // Ensure main toggle is visible when ViewMax is not active
       if (this.toggleElement) {
         this.ensureToggleVisibility();
-        // Force responsive positioning after creation
         setTimeout(() => {
           this.handleResponsiveTogglePosition();
         }, 200);
@@ -126,6 +128,36 @@ class ViewMax {
         }
       };
       checkForVideo();
+    });
+  }
+
+  // New: wait until watch page containers are present (first-load safe)
+  async waitForWatchPageReady() {
+    return new Promise((resolve) => {
+      let attempts = 0;
+      const maxAttempts = 40; // ~10s at 250ms intervals
+
+      const check = () => {
+        attempts++;
+        const moviePlayer = document.querySelector('#movie_player');
+        const videoElement = document.querySelector('video');
+        const container =
+          document.querySelector('#secondary') ||
+          document.querySelector('#player') ||
+          document.querySelector('ytd-watch-flexy');
+
+        if (moviePlayer && videoElement && container) {
+          console.log('ViewMax: Watch page ready (containers found)');
+          resolve(true);
+        } else if (attempts >= maxAttempts) {
+          console.log('ViewMax: Watch page not fully ready, proceeding anyway');
+          resolve(false);
+        } else {
+          setTimeout(check, 250);
+        }
+      };
+
+      check();
     });
   }
 
@@ -369,6 +401,12 @@ class ViewMax {
 
   disableFullWebMode() {
     console.log('ViewMax: Disabling full web mode');
+
+    // Cancel any pending fullscreen-exit recovery to avoid races
+    if (this.fullscreenExitTimeoutId) {
+      clearTimeout(this.fullscreenExitTimeoutId);
+      this.fullscreenExitTimeoutId = null;
+    }
 
     // Restore body overflow
     document.body.style.overflow = '';
@@ -732,11 +770,24 @@ class ViewMax {
   }
 
   showElements() {
-    this.hiddenElements.forEach(({ element, originalDisplay }) => {
+    // Restore from tracked list
+    this.hiddenElements.forEach(({ element }) => {
       element.classList.remove('viewmax-hidden');
-      // Don't set display style, let CSS handle it
     });
     this.hiddenElements = [];
+
+    // Fallback: remove lingering classes anywhere in the DOM
+    document.querySelectorAll('.viewmax-hidden').forEach(el => {
+      el.classList.remove('viewmax-hidden');
+    });
+
+    // Second pass after SPA settles (covers post-fullscreen DOM changes)
+    setTimeout(() => {
+      document.querySelectorAll('.viewmax-hidden').forEach(el => {
+        el.classList.remove('viewmax-hidden');
+      });
+    }, 300);
+
     console.log('ViewMax: Restored all hidden elements');
   }
 
@@ -1304,13 +1355,11 @@ class ViewMax {
     // Check if we're on a video page
     if (!this.isVideoPage()) {
       console.log('ViewMax: Not on video page after navigation');
-      // If we're leaving a video page, clean up
       const existingToggle = document.getElementById('viewmax-toggle');
       if (existingToggle) {
         existingToggle.remove();
         this.toggleElement = null;
       }
-      // Disable full web mode if it's active
       if (this.isFullWebMode) {
         this.isFullWebMode = false;
         this.disableFullWebMode();
@@ -1320,8 +1369,11 @@ class ViewMax {
 
     console.log('ViewMax: On video page, initializing...');
 
-    // Wait for new video to load
+    // Wait for video and YouTube structure
     await this.waitForYouTube();
+
+    // EXTRA: wait until watch page containers exist (first-load SPA fix)
+    await this.waitForWatchPageReady();
 
     // Initialize for the new video page
     await this.initializeForVideoPage();

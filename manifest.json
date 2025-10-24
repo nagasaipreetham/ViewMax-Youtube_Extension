@@ -9,7 +9,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://www.youtube.com/*"
+        "*://*.youtube.com/*"
       ],
       "js": [
         "content.js"
@@ -43,7 +43,7 @@
         "icon.png"
       ],
       "matches": [
-        "*://www.youtube.com/*"
+        "*://*.youtube.com/*"
       ]
     }
   ]
