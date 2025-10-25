@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ViewMax",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ViewMax lets you watch YouTube videos distraction-free by expanding the video to fill the whole webpage.",
   "permissions": [
     "activeTab"

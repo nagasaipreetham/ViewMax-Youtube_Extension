@@ -10,11 +10,6 @@ class ViewMax {
     this.mouseTrackingAdded = false;
     this.fullscreenChangeHandler = null;
     this.fullscreenExitTimeoutId = null;
-
-    // Track last navigation handled to avoid duplicate cleanup/injection
-    this.lastHandledUrl = null;
-    this.lastHandledTs = 0;
-
     this.init();
   }
 
@@ -1380,17 +1375,6 @@ class ViewMax {
   async handleNavigation() {
     console.log('ViewMax: Handling navigation...');
 
-    // Skip duplicate handling for the same URL within a short cooldown
-    const currentUrl = location.href;
-    const now = Date.now();
-    if (this.lastHandledUrl === currentUrl && (now - this.lastHandledTs) < 3000) {
-      console.log('ViewMax: Skip duplicate navigation within cooldown');
-      return;
-    }
-    // Record before proceeding so overlapping calls also respect the guard
-    this.lastHandledUrl = currentUrl;
-    this.lastHandledTs = now;
-
     // Clean up existing state first
     this.cleanup(false); // Don't remove global listeners
 
@@ -1411,8 +1395,11 @@ class ViewMax {
 
     console.log('ViewMax: On video page, initializing...');
 
-    // Wait for new video to load
+    // Wait for video and YouTube structure
     await this.waitForYouTube();
+
+    // EXTRA: wait until watch page containers exist (first-load SPA fix)
+    await this.waitForWatchPageReady();
 
     // Initialize for the new video page
     await this.initializeForVideoPage();
