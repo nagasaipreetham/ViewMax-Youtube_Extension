@@ -10,6 +10,11 @@ class ViewMax {
     this.mouseTrackingAdded = false;
     this.fullscreenChangeHandler = null;
     this.fullscreenExitTimeoutId = null;
+
+    // Track last navigation handled to avoid duplicate cleanup/injection
+    this.lastHandledUrl = null;
+    this.lastHandledTs = 0;
+
     this.init();
   }
 
@@ -202,19 +207,21 @@ class ViewMax {
 
       // Enhanced sidebar detection with more selectors and fallbacks
       const sidebarSelectors = [
+        '#columns #secondary',
         '#secondary',
         '#secondary-inner',
         'ytd-watch-next-secondary-results-renderer',
         '#related',
         'ytd-secondary-pyv-renderer',
         '#watch-sidebar',
-        '.watch-sidebar'
+        '.watch-sidebar',
+        'ytd-watch-flexy #secondary'
       ];
 
       let sidebar = null;
       let fallbackContainer = null;
 
-      // Try to find sidebar
+      // Try to find sidebar (stable for large screens)
       for (const selector of sidebarSelectors) {
         sidebar = document.querySelector(selector);
         if (sidebar) {
@@ -223,17 +230,33 @@ class ViewMax {
         }
       }
 
-      // If no sidebar found, try fallback locations
+      // If no sidebar found, prefer primary column (stable, visible area)
       if (!sidebar) {
-        const playerDiv = document.querySelector('#player');
-        const watchFlexy = document.querySelector('ytd-watch-flexy');
+        const primarySelectors = [
+          '#columns #primary',
+          '#primary',
+          'ytd-watch-flexy #primary'
+        ];
+        for (const selector of primarySelectors) {
+          const node = document.querySelector(selector);
+          if (node) {
+            fallbackContainer = node;
+            console.log(`ViewMax: Using primary column as fallback: ${selector}`);
+            break;
+          }
+        }
 
-        if (playerDiv) {
-          fallbackContainer = playerDiv;
-          console.log("ViewMax: Using player div as fallback container");
-        } else if (watchFlexy) {
-          fallbackContainer = watchFlexy;
-          console.log("ViewMax: Using watch-flexy as fallback container");
+        // Last resort: player or watch-flexy (but still mount inside parent)
+        if (!fallbackContainer) {
+          const playerDiv = document.querySelector('#player');
+          const watchFlexy = document.querySelector('ytd-watch-flexy');
+          if (playerDiv && playerDiv.parentElement) {
+            fallbackContainer = playerDiv.parentElement;
+            console.log("ViewMax: Using player's parent as fallback container");
+          } else if (watchFlexy) {
+            fallbackContainer = watchFlexy;
+            console.log("ViewMax: Using watch-flexy as fallback container");
+          }
         }
       }
 
@@ -268,10 +291,17 @@ class ViewMax {
 
       // Insert based on container type
       if (sidebar) {
+        // Sidebar: put at top, consistent with YouTube layout
         sidebar.prepend(container);
+        container.classList.add('viewmax-toggle-sidebar');
       } else {
-        // For fallback containers, insert after the element
-        targetContainer.insertAdjacentElement('afterend', container);
+        // Fallback: put at top of the primary column (stable, visible)
+        try {
+          targetContainer.prepend(container);
+        } catch (e) {
+          // Fallback again: append to container if prepend fails
+          targetContainer.appendChild(container);
+        }
         container.classList.add('viewmax-toggle-below-player');
       }
 
@@ -304,7 +334,8 @@ class ViewMax {
       // Handle initial responsive positioning
       setTimeout(() => {
         this.handleResponsiveTogglePosition();
-      }, 100);
+        this.ensureToggleVisibility();
+      }, 150);
 
       console.log("✅ ViewMax UI injected successfully");
       resolve(true);
@@ -1349,6 +1380,17 @@ class ViewMax {
   async handleNavigation() {
     console.log('ViewMax: Handling navigation...');
 
+    // Skip duplicate handling for the same URL within a short cooldown
+    const currentUrl = location.href;
+    const now = Date.now();
+    if (this.lastHandledUrl === currentUrl && (now - this.lastHandledTs) < 3000) {
+      console.log('ViewMax: Skip duplicate navigation within cooldown');
+      return;
+    }
+    // Record before proceeding so overlapping calls also respect the guard
+    this.lastHandledUrl = currentUrl;
+    this.lastHandledTs = now;
+
     // Clean up existing state first
     this.cleanup(false); // Don't remove global listeners
 
@@ -1369,11 +1411,8 @@ class ViewMax {
 
     console.log('ViewMax: On video page, initializing...');
 
-    // Wait for video and YouTube structure
+    // Wait for new video to load
     await this.waitForYouTube();
-
-    // EXTRA: wait until watch page containers exist (first-load SPA fix)
-    await this.waitForWatchPageReady();
 
     // Initialize for the new video page
     await this.initializeForVideoPage();
